@@ -1,7 +1,9 @@
 package main
 
 import (
+	"Plrx/lib/templates"
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
@@ -15,16 +17,6 @@ import (
 	"reflect"
 	"strings"
 
-	"Plrx/lib/constant"
-	"Plrx/lib/constant/EventType"
-	"Plrx/lib/context"
-	"Plrx/lib/plugin"
-	"Plrx/lib/qqapi"
-	"Plrx/lib/requests"
-	"Plrx/lib/structers"
-	"Plrx/lib/templates"
-	_ "Plrx/plugins"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,12 +24,12 @@ import (
 type Payload struct {
 	ID        string              `json:"id"`
 	Op        int                 `json:"op"`
-	Data      MessageData         `json:"d"`
+	Data      PrasedData          `json:"d"`
 	T         string              `json:"t"`
 	EventType EventType.EventType `json:"-"`
 }
 
-type MessageData struct {
+type PrasedData struct {
 	Id          string `json:"id"`
 	Content     string `json:"content"`
 	GroupOpenID string `json:"group_openid"`

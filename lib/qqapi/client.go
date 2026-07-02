@@ -2,7 +2,6 @@ package qqapi
 
 import (
 	"Plrx/lib/requests"
-	"Plrx/lib/structers"
 	"fmt"
 	"strconv"
 	"sync"
@@ -86,10 +85,7 @@ func (c *Client) generateHeader() (map[string]string, error) {
 }
 
 // 发送群消息
-func (c *Client) SendGroupMessage(msg structers.Message, groupId string) error {
-	// 从消息生成JSON
-	data := msg.GenerateJSON()
-	// log.Printf("[Debug]完整请求JSON: %v", string(data))
+func (c *Client) SendGroupMessage(data []byte, groupId string) error {
 	// 获取请求头
 	header, err := c.generateHeader()
 	if err != nil {
@@ -103,9 +99,7 @@ func (c *Client) SendGroupMessage(msg structers.Message, groupId string) error {
 }
 
 // 发送私信消息
-func (c *Client) SendPrivateMessage(msg structers.Message, userId string) error {
-	// 从消息生成JSON
-	data := msg.GenerateJSON()
+func (c *Client) SendPrivateMessage(data []byte, userId string) error {
 	// 获取请求头
 	header, err := c.generateHeader()
 	if err != nil {
