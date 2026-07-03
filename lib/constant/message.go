@@ -1,0 +1,18 @@
+package constant
+
+// 消息来源/发送目标
+type MessageOrigin uint8
+
+const (
+	GroupMessage MessageOrigin = iota
+	PrivateMessage
+)
+
+// 发送消息类型
+
+type MessageType uint8
+
+const (
+	PlainText MessageType = 0
+	Markdown  MessageType = 2
+)

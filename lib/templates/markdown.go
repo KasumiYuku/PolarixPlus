@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+type Markdown struct {
+	Content string `json:"markdown"`
+}
+
+// 实现omitzero
+func (m Markdown) IsZero() bool {
+	return m.Content == ""
+}
+
 type MarkdownTemplate struct {
 	Id       string
 	Template string
@@ -110,14 +119,15 @@ func FillMarkdownTemplate(Id string, arg Args) (string, error) {
 			}
 			_, afterDo := processTemplate(template)
 			if len(afterDo) > 0 {
-				var lostArgs string = afterDo[0]
+				var lostArgs strings.Builder
+				lostArgs.WriteString(afterDo[0])
 				for k, i := range afterDo {
 					if k == 0 {
 						continue
 					}
-					lostArgs += fmt.Sprintf(", %v", i)
+					fmt.Fprintf(&lostArgs, ", %v", i)
 				}
-				return "", fmt.Errorf("Lost args: %v", lostArgs)
+				return "", fmt.Errorf("Lost args: %v", lostArgs.String())
 			} else {
 				return template, nil
 			}

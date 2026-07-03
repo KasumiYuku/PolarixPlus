@@ -1,4 +1,4 @@
-package structers
+package config
 
 type Plugin struct {
 	Id     string   `json:"id"`

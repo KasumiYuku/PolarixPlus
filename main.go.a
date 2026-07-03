@@ -1,6 +1,9 @@
 package main
 
 import (
+	"Plrx/lib/config"
+	"Plrx/lib/qqapi"
+	"Plrx/lib/requests"
 	"Plrx/lib/templates"
 	"bytes"
 	"context"
@@ -46,14 +49,14 @@ type PrasedData struct {
 
 var requestsClient *requests.Client = requests.Init(5)
 
-func initConfig() structers.AppConfig {
+func initConfig() config.AppConfig {
 	file, err := os.ReadFile("./config.json")
 	if err != nil {
 		fmt.Println("请正确配置config.json")
 		os.Exit(1)
 	}
 
-	var appConfig structers.AppConfig
+	var appConfig config.AppConfig
 	err = json.Unmarshal(file, &appConfig)
 	if err != nil {
 		fmt.Println("请正确配置config.json")
