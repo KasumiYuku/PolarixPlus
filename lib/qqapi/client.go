@@ -25,6 +25,7 @@ func Init(AppID string, AppSecret string, ProxyAPI string, requests *requests.Cl
 		ProxyAPI:    ProxyAPI,
 		Request:     requests,
 		accessToken: "",
+		lock:        sync.RWMutex{},
 	}
 }
 
@@ -91,6 +92,7 @@ func (c *Client) SendGroupMessage(data []byte, groupId string) error {
 	if err != nil {
 		return err
 	}
+	// log.Printf("发送给%v, data = %v\n", fmt.Sprintf("%v/v2/groups/%v/messages", c.ProxyAPI, groupId), string(data))
 	err = c.Request.Post(fmt.Sprintf("%v/v2/groups/%v/messages", c.ProxyAPI, groupId), data, nil, header)
 	if err != nil {
 		return err

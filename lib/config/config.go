@@ -1,5 +1,11 @@
 package config
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
 type Plugin struct {
 	Id     string   `json:"id"`
 	Prefix string   `json:"prefix"`
@@ -14,4 +20,20 @@ type AppConfig struct {
 	ProxyAPI  string   `json:"proxy"`
 	Uin       uint64   `json:"uin"`
 	Uid       string   `json:"uid"`
+}
+
+func InitConfig() AppConfig {
+	file, err := os.ReadFile("./config.json")
+	if err != nil {
+		fmt.Println("请正确配置config.json")
+		os.Exit(1)
+	}
+
+	var appConfig AppConfig
+	err = json.Unmarshal(file, &appConfig)
+	if err != nil {
+		fmt.Println("请正确配置config.json")
+		os.Exit(1)
+	}
+	return appConfig
 }

@@ -3,12 +3,15 @@ package templates
 import (
 	"Plrx/lib/images"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 type Markdown struct {
-	Content string `json:"markdown"`
+	Content string `json:"content"`
 }
 
 // 实现omitzero
@@ -23,6 +26,8 @@ type MarkdownTemplate struct {
 }
 
 type Args map[string]any
+
+var markdownTemplateCount uint
 
 func ToMapString(h Args) (map[string]string, error) {
 	result := make(map[string]string, len(h))
@@ -134,4 +139,42 @@ func FillMarkdownTemplate(Id string, arg Args) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("Template %v not found", Id)
+}
+
+func init() {
+	markdownTemplateCount = 0
+	// Markdown模板
+	root := "templates/markdown"
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		// 处理遍历过程中的错误
+		if err != nil {
+			panic(err)
+		}
+
+		// 忽略目录，只处理文件
+		if d.IsDir() {
+			return nil
+		}
+
+		// 检查文件后缀是否为 .md
+		if filepath.Ext(path) == ".md" {
+			fileName := strings.TrimSuffix(filepath.Base(path), ".md")
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			NewMarkdownTemplate(fileName, string(content))
+			markdownTemplateCount++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func GetMarkdownTemplateCount() uint {
+	return markdownTemplateCount
 }
