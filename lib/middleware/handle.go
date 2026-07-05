@@ -66,10 +66,19 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			ctx.Init(payload.Data.Id, payload.ID, client)
 			ctx.SetGroupId(payload.Data.GroupOpenID)
 			ctx.SetUserId(payload.Data.Author.UnionID)
-			err := cmd.Handle(&ctx)
-			if err != nil {
-				log.Printf("[Error]插件: %v 在执行 %v 指令时报错: %v\n", cmd.PluginId, cmd.Prefix, err)
-			}
+			// err := cmd.Handle(&ctx)
+			go messageRecoveryFunc(cmd, &ctx)
 		}
+	}
+}
+
+func messageRecoveryFunc(cmd *plugin.Command, context *context.MessageContext) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("在执行指令%v (插件: %v)的时候出现panic: %v", cmd.Prefix, cmd.PluginId, r)
+		}
+	}()
+	if err := cmd.Handle(context); err != nil {
+		log.Printf("在执行指令%v (插件: %v)的时候出现error: %v", cmd.Prefix, cmd.PluginId, err)
 	}
 }
