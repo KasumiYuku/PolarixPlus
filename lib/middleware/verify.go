@@ -50,7 +50,7 @@ func VerifySignature(botSecret string) gin.HandlerFunc {
 			return
 		}
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
+		// log.Printf("[Debug]Raw request: %v", string(bodyBytes))
 		// 拼接签名体
 		var msg bytes.Buffer
 		msg.WriteString(timestamp)

@@ -21,6 +21,20 @@ func Init(timeout int) *Client {
 	}
 }
 
+func (c *Client) Put(url string, result any, headers map[string]string) error {
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create PUT request: %w", err)
+	}
+
+	// 写入自定义 Header
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	return c.do(req, result)
+}
+
 func (c *Client) Get(url string, result any, headers map[string]string) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

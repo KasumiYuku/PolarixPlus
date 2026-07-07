@@ -113,3 +113,12 @@ func (c *Client) SendPrivateMessage(data []byte, userId string) error {
 	}
 	return nil
 }
+
+// 回复回调按钮
+func (c *Client) InteracteCallback(eventId string) error {
+	header, err := c.generateHeader()
+	if err != nil {
+		return err
+	}
+	return c.Request.Put(fmt.Sprintf("%v/interactions/%v", c.ProxyAPI, eventId), nil, header)
+}

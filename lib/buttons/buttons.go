@@ -1,6 +1,7 @@
 package buttons
 
 import (
+	"Plrx/lib/context"
 	"fmt"
 )
 
@@ -98,7 +99,19 @@ func (button *Button) SetHref(url string) *Button {
 	return button
 }
 
-func (button *Button) SetCallback(data string) *Button {
+func (button *Button) SetCallback(data string, handle CallbackButtonHandleFunc) *Button {
+	// 储存回调数据
+	button.Action.CallbackData = data
+	button.Action.Type = Callback
+	// 添加回调函数
+	CallbackFuncMapLock.Lock()
+	defer CallbackFuncMapLock.Unlock()
+	CallbackFuncMap[button.Id] = handle
+	return button
+}
+
+func (button *Button) SetCallbackWithoutHandle(data string) *Button {
+	// 储存回调数据
 	button.Action.CallbackData = data
 	button.Action.Type = Callback
 	return button
@@ -119,3 +132,5 @@ func (button *Button) SetUnsupportedTip(tip string) *Button {
 	button.Action.UnsupportTips = tip
 	return button
 }
+
+type CallbackButtonHandleFunc func(*context.CallbackContext) error

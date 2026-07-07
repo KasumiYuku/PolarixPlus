@@ -11,6 +11,11 @@ type Payload struct {
 	EventType constant.EventType `json:"-"`
 }
 
+type CallbackData struct {
+	ButtonData string `json:"button_data"`
+	ButtonId   string `json:"button_id"`
+}
+
 type PrasedData struct {
 	Id          string `json:"id"`
 	Content     string `json:"content"`
@@ -19,9 +24,13 @@ type PrasedData struct {
 		UnionID  string                `json:"union_openid"`
 		Role     constant.RoleRequired `json:"member_role"`
 		Username string                `json:"username"`
-		MemberId string
 	} `json:"author"`
 	// 用于 Op=13 时的网络探测数据结构
 	PlainToken string `json:"plain_token"`
 	EventTs    string `json:"event_ts"`
+	// 回调按钮
+	Scene    string `json:"scene"`
+	Callback struct {
+		Resolved CallbackData `json:"resolved"`
+	} `json:"data"`
 }

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"Plrx/lib/buttons"
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
 	"Plrx/lib/message"
@@ -69,16 +70,46 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			// err := cmd.Handle(&ctx)
 			go messageRecoveryFunc(cmd, &ctx)
 		}
+	case constant.INTERACTION_CREATE:
+		data := payload.Data.Callback.Resolved.ButtonData
+		buttonId := payload.Data.Callback.Resolved.ButtonId
+		// log.Printf("收到回调按钮推送, 按钮ID = %v", buttonId)
+		callbackFunc, ok := buttons.GetCallbackFunc(buttonId)
+		if !ok {
+			log.Printf("回调按钮: %v未注册回调函数, 跳过处理", buttonId)
+			return
+		}
+		// 找到了回调函数
+		ctx := &context.CallbackContext{}
+		ctx.Init(payload.ID, client)
+		ctx.ButtonId = buttonId
+		ctx.Data = data
+		ctx.GroupId = payload.Data.GroupOpenID
+		go callbackHandleFunc(callbackFunc, ctx)
 	}
 }
 
 func messageRecoveryFunc(cmd *plugin.Command, context *context.MessageContext) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("在执行指令%v (插件: %v)的时候出现panic: %v", cmd.Prefix, cmd.PluginId, r)
+			log.Printf("在执行指令%v (插件: %v)时出现panic: %v", cmd.Prefix, cmd.PluginId, r)
 		}
 	}()
 	if err := cmd.Handle(context); err != nil {
-		log.Printf("在执行指令%v (插件: %v)的时候出现error: %v", cmd.Prefix, cmd.PluginId, err)
+		log.Printf("在执行指令%v (插件: %v)时出现error: %v", cmd.Prefix, cmd.PluginId, err)
+	}
+}
+
+func callbackHandleFunc(handle buttons.CallbackButtonHandleFunc, ctx *context.CallbackContext) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("在执行回调按钮: %v 处理函数时候出现panic: %v", ctx.ButtonId, r)
+		}
+	}()
+	if err := ctx.Done(); err != nil {
+		log.Printf("在处理回调按钮上报: %v 时候出现error: %v", ctx.ButtonId, err)
+	}
+	if err := handle(ctx); err != nil {
+		log.Printf("在执行回调按钮: %v 处理函数时候出现error: %v", ctx.ButtonId, err)
 	}
 }

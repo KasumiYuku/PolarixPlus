@@ -1,7 +1,7 @@
 package echo
 
 import (
-	buttons "Plrx/lib/button"
+	"Plrx/lib/buttons"
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
 	"Plrx/lib/plugin"
@@ -30,10 +30,21 @@ func init() {
 		Id:       "echo",
 		Commands: commands,
 	})
+
+	buttons.RegisterCallbackFunc("callbacktest", echoButtonCallback)
 }
 
 func echoHandlefunc(context *context.MessageContext) error {
-	return context.Markdown(context.Raw).Send()
+	msg := context.Markdown(context.Raw)
+	k := &buttons.Keyboard{}
+	btn, _ := k.AppendButton("callbacktest", "回调按钮测试", "点击了", buttons.Gray, 0)
+	btn.SetCallbackWithoutHandle(context.Content).SetUnsupportedTip("1").SetUserWhiteList(append(make([]string, 0), context.UserId))
+	msg.Keyboard(k)
+	return msg.Send()
+}
+
+func echoButtonCallback(context *context.CallbackContext) error {
+	return context.Markdown(fmt.Sprintf("## 收到回调\n额外数据:\n```\n%v\n```", context.Data)).Send()
 }
 
 func randomImg(context *context.MessageContext) error {
@@ -52,7 +63,6 @@ func randomImg(context *context.MessageContext) error {
 	btn, _ := k.AppendButton("1", "再来一张", "还要啊", buttons.Blue, 0)
 	btn.SetAutoCommand("/random", true, false).SetUnsupportedTip("不支持按钮捏").SetPermission(buttons.AllUser)
 	msg.Keyboard(k)
-	msg.Send()
 	// context.Text(fmt.Sprintf("![img #%v #%v](%v)\n> 图片源: [loliapi](https://www.loliapi.com/)\n> Origin:\n```\n%v\n```", re.Witdh, re.Height, re.Url, re.Url)).Send()
-	return nil
+	return msg.Send()
 }
