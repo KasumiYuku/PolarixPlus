@@ -3,6 +3,8 @@ package plugin
 import (
 	"Plrx/lib/context"
 	"Plrx/lib/parser"
+	"Plrx/lib/utils"
+	"log"
 	"strings"
 	"sync"
 )
@@ -13,8 +15,8 @@ var commandCount uint = 0
 
 // 处理所有子指令的回调函数
 func subCommandHandle(command *Command, pluginId string) {
-	lock.Lock()
-	defer lock.Unlock()
+	// lock.Lock()
+	// defer lock.Unlock()
 	// 处理解析器接口
 	if command.Parser == nil {
 		command.Parser = &parser.DefaultParser{}
@@ -66,14 +68,18 @@ func GetCommand(prefix string) (*Command, bool) {
 
 // 处理包含子指令的指令
 func subCommandHandleFunc(context *context.MessageContext) error {
-	args := strings.Split(context.Raw, " ") // 一定会有0号元素, 这里已经是传入的指令处理部分了
-	currentCmd, ok := GetCommand(args[0])   // 获取父级指令对象
+	// args := strings.Split(context.Raw, " ")
+	args := strings.Split(utils.FilterAt(context.Raw), " ") // 一定会有0号元素, 这里已经是传入的指令处理部分了
+	currentCmd, ok := GetCommand(args[0])                   // 获取父级指令对象
+	log.Printf("正在处理Prefix为 %v 的指令的子指令", currentCmd.Prefix)
 	if !ok || currentCmd == nil {
 		return nil
 	}
 	subCommandPrefixIndex := 1 // 子指令前缀的索引位置
 	for {
-		if len(currentCmd.SubCommand) == 0 {
+		log.Printf("正在匹配参数位: %v", subCommandPrefixIndex)
+		if currentCmd.Handle == nil || len(currentCmd.SubCommand) == 0 {
+			log.Printf("指令 %v 已经是叶子指令, 执行处理函数", currentCmd.Prefix)
 			// 叶子指令
 			return currentCmd.Handle(context)
 		}
