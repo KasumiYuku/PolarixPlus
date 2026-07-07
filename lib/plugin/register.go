@@ -43,6 +43,9 @@ func Register(plugin *Plugin) {
 		if v.Parser == nil {
 			v.Parser = &parser.DefaultParser{} // 如果没有自定义解析器, 使用默认的解析器
 		}
+		if v.Handle == nil {
+			v.Handle = defaultCommandHandle
+		}
 		if len(v.SubCommand) > 0 {
 			// 存在子指令, 替换处理函数
 			subCommandHandle(v, plugin.Id)
@@ -77,6 +80,9 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 
 		// 无法提取子指令
 		if len(args) <= subCommandPrefixIndex {
+			if currentCmd.SubCommandFallback == nil {
+				return nil
+			}
 			return currentCmd.SubCommandFallback(context)
 		}
 
@@ -93,6 +99,9 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 
 		if targetCommand == nil {
 			// 没有找到
+			if currentCmd.SubCommandFallback == nil {
+				return nil
+			}
 			return currentCmd.SubCommandFallback(context)
 		}
 
@@ -105,4 +114,9 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 // 获取总指令数
 func GetCommandCount() uint {
 	return commandCount
+}
+
+// 兜底处理函数
+func defaultCommandHandle(_ *context.MessageContext) error {
+	return nil
 }
