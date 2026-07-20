@@ -7,6 +7,7 @@ import (
 	"Plrx/lib/plugin"
 	"Plrx/lib/qqapi"
 	"Plrx/lib/requests"
+	"Plrx/lib/storage"
 	"Plrx/lib/structers"
 	"Plrx/lib/templates"
 	_ "Plrx/plugins"
@@ -26,6 +27,14 @@ var requestsClient *requests.Client = requests.Init(5)
 func main() {
 	// 初始化相关配置
 	appConfig := config.InitConfig()
+	if err := storage.Open(appConfig.Database); err != nil {
+		log.Fatalf("Failed to initialize SQLite storage: %v", err)
+	}
+	defer func() {
+		if err := storage.Close(); err != nil {
+			log.Printf("Failed to close SQLite storage: %v", err)
+		}
+	}()
 	client := qqapi.Init(appConfig.AppId, appConfig.AppSecret, appConfig.ProxyAPI, requestsClient)
 	r := gin.Default()
 

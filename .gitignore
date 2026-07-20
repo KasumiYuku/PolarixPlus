@@ -1,1 +1,4 @@
 config.json
+*.db
+*.db-shm
+*.db-wal

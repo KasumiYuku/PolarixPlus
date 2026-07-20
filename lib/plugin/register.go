@@ -71,10 +71,12 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 	// args := strings.Split(context.Raw, " ")
 	args := strings.Split(utils.FilterAt(context.Raw), " ") // 一定会有0号元素, 这里已经是传入的指令处理部分了
 	currentCmd, ok := GetCommand(args[0])                   // 获取父级指令对象
-	log.Printf("正在处理Prefix为 %v 的指令的子指令", currentCmd.Prefix)
 	if !ok || currentCmd == nil {
 		return nil
 	}
+	commandPath := currentCmd.Prefix
+	context.BindStorage(currentCmd.PluginId, commandPath)
+	log.Printf("正在处理Prefix为 %v 的指令的子指令", currentCmd.Prefix)
 	subCommandPrefixIndex := 1 // 子指令前缀的索引位置
 	for {
 		log.Printf("正在匹配参数位: %v", subCommandPrefixIndex)
@@ -113,6 +115,8 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 
 		// 下一个匹配
 		currentCmd = targetCommand
+		commandPath += " " + currentCmd.Prefix
+		context.BindStorage(currentCmd.PluginId, commandPath)
 		subCommandPrefixIndex++
 	}
 }

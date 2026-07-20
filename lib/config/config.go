@@ -20,6 +20,7 @@ type AppConfig struct {
 	ProxyAPI  string   `json:"proxy"`
 	Uin       uint64   `json:"uin"`
 	Uid       string   `json:"uid"`
+	Database  string   `json:"database"`
 }
 
 func InitConfig() AppConfig {
@@ -34,6 +35,9 @@ func InitConfig() AppConfig {
 	if err != nil {
 		fmt.Println("请正确配置config.json")
 		os.Exit(1)
+	}
+	if appConfig.Database == "" {
+		appConfig.Database = "bot.db"
 	}
 	return appConfig
 }

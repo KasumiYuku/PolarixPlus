@@ -65,6 +65,7 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			metaContext.Init(payload.Data.Id, payload.ID, client)
 			ctx.Context = metaContext
 			ctx.Init(payload.Data.Id, payload.ID, client)
+			ctx.BindStorage(cmd.PluginId, cmd.Prefix)
 			ctx.SetGroupId(payload.Data.GroupOpenID)
 			ctx.SetUserId(payload.Data.Author.UnionID)
 			// err := cmd.Handle(&ctx)
