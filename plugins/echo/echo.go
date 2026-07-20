@@ -5,6 +5,7 @@ import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
 	"Plrx/lib/plugin"
+	"Plrx/lib/templates"
 	"fmt"
 )
 
@@ -24,6 +25,13 @@ func init() {
 		Role:     constant.RoleMember,
 		Describe: "随机图",
 		Handle:   randomImg,
+	})
+
+	commands = append(commands, &plugin.Command{
+		Prefix:   "/uid",
+		Role:     constant.RoleMember,
+		Describe: "获取UID",
+		Handle:   getUid,
 	})
 
 	plugin.Register(&plugin.Plugin{
@@ -65,4 +73,15 @@ func randomImg(context *context.MessageContext) error {
 	msg.Keyboard(k)
 	// context.Text(fmt.Sprintf("![img #%v #%v](%v)\n> 图片源: [loliapi](https://www.loliapi.com/)\n> Origin:\n```\n%v\n```", re.Witdh, re.Height, re.Url, re.Url)).Send()
 	return msg.Send()
+}
+
+func getUid(context *context.MessageContext) error {
+	md, err := context.MarkdownTemplate("UserIdCard", &templates.Args{
+		"id":     context.UserId,
+		"msg_id": context.MessageId,
+	})
+	if err != nil {
+		return err
+	}
+	return md.Send()
 }
