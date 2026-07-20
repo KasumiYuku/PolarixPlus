@@ -29,7 +29,7 @@ func init() {
 
 	commands = append(commands, &plugin.Command{
 		Prefix:   "/uid",
-		Role:     constant.RoleMember,
+		Role:     constant.RoleOwner,
 		Describe: "获取UID",
 		Handle:   getUid,
 	})

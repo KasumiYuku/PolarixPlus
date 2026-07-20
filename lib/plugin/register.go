@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"Plrx/lib/constant"
 	"Plrx/lib/context"
 	"Plrx/lib/parser"
 	"Plrx/lib/utils"
@@ -111,6 +112,9 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 				return nil
 			}
 			return currentCmd.SubCommandFallback(context)
+		}
+		if context.MessageManager.Target == constant.PrivateMessage && targetCommand.DisablePrivate {
+			return nil
 		}
 
 		// 下一个匹配

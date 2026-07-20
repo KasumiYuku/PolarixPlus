@@ -10,6 +10,7 @@ import (
 	"Plrx/lib/storage"
 	"Plrx/lib/structers"
 	"Plrx/lib/templates"
+	plugins_push "Plrx/plugins/push"
 	_ "Plrx/plugins"
 	"bytes"
 	"crypto/ed25519"
@@ -36,12 +37,16 @@ func main() {
 		}
 	}()
 	client := qqapi.Init(appConfig.AppId, appConfig.AppSecret, appConfig.ProxyAPI, requestsClient)
+	plugins_push.SetClient(&client)
 	r := gin.Default()
 
-	// 签名校验中间件
-	r.Use(middleware.VerifySignature(appConfig.AppSecret))
+	// 主动推送接口 (不经过QQ签名校验)
+	r.POST("/push/:scope/:openid", plugins_push.HTTPHandle)
 
-	r.POST("/webhook", func(c *gin.Context) {
+	// 仅 webhook 需要QQ签名校验
+	webhook := r.Group("/")
+	webhook.Use(middleware.VerifySignature(appConfig.AppSecret))
+	webhook.POST("/webhook", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 		// 中间件已提取
 		var payload structers.Payload

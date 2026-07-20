@@ -12,6 +12,7 @@ type CommandHandleFunc func(*context.MessageContext) error
 type Command struct {
 	Prefix             string                // 指令前缀
 	Role               constant.RoleRequired // 最低权限
+	DisablePrivate     bool                  // 是否禁止在私聊中使用
 	Describe           string                // 指令描述
 	Handle             CommandHandleFunc     // 处理函数
 	PluginId           string                // 属于的插件ID

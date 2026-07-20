@@ -25,6 +25,12 @@ func VerifySignature(botSecret string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		// 主动推送接口不走QQ签名校验
+		if strings.HasPrefix(c.Request.URL.Path, "/push/") {
+			c.Next()
+			return
+		}
+
 		// 获取 Header 参数
 		signature := c.GetHeader("X-Signature-Ed25519")
 		timestamp := c.GetHeader("X-Signature-Timestamp")

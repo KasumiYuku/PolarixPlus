@@ -88,8 +88,7 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		if !ok {
 			return
 		}
-		if !cmd.Role.CanUse(constant.RoleMember) {
-			log.Printf("私聊用户%v无权限使用%v指令", payload.Data.Author.UserOpenID, cmd.Prefix)
+		if cmd.DisablePrivate {
 			return
 		}
 
