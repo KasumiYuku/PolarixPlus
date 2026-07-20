@@ -128,6 +128,7 @@ func pushStatus(ctx *context.MessageContext) error {
 
 func setPushKey(ctx *context.MessageContext) error {
 	args := strings.Fields(ctx.Content)
+	fmt.Printf("设置密钥指令Content: %v\n", ctx.Content)
 	if len(args) < 2 {
 		return ctx.Text("用法: /pushkey [key]").Send()
 	}
@@ -135,7 +136,13 @@ func setPushKey(ctx *context.MessageContext) error {
 	if key == "" {
 		return ctx.Text("密钥不能为空").Send()
 	}
-	if err := storage.Global().Set(storeKeyPushKey, key); err != nil {
+	var err error
+	if ctx.GroupId != "" {
+		err = storage.Global().Set(ctx.GroupId+storeKeyPushKey, key)
+	} else {
+		err = storage.Global().Set(ctx.UserId+storeKeyPushKey, key)
+	}
+	if err != nil {
 		return ctx.Text("设置失败: " + err.Error()).Send()
 	}
 	return ctx.Text("已更新主动推送密钥").Send()
@@ -174,7 +181,7 @@ func HTTPHandle(c *gin.Context) {
 	if key == "" {
 		key = req.Key
 	}
-	if !verifyPushKey(key) {
+	if !verifyPushKey(openid, key) {
 		c.JSON(http.StatusUnauthorized, pushResponse{Error: "invalid or missing push key"})
 		return
 	}
@@ -222,12 +229,12 @@ func HTTPHandle(c *gin.Context) {
 	c.JSON(http.StatusOK, pushResponse{OK: true})
 }
 
-func verifyPushKey(provided string) bool {
+func verifyPushKey(openid string, provided string) bool {
 	if provided == "" {
 		return false
 	}
 	var stored string
-	found, err := storage.Global().Get(storeKeyPushKey, &stored)
+	found, err := storage.Global().Get(openid+storeKeyPushKey, &stored)
 	if err != nil || !found {
 		return false
 	}
