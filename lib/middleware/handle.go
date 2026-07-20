@@ -67,10 +67,59 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			ctx.Init(payload.Data.Id, payload.ID, client)
 			ctx.BindStorage(cmd.PluginId, cmd.Prefix)
 			ctx.SetGroupId(payload.Data.GroupOpenID)
-			ctx.SetUserId(payload.Data.Author.UnionID)
+			userID := payload.Data.Author.MemberOpenID
+			if userID == "" {
+				userID = payload.Data.Author.UnionID
+			}
+			ctx.SetUserId(userID)
+			ctx.SetMessageOrigin(constant.GroupMessage)
 			// err := cmd.Handle(&ctx)
 			go messageRecoveryFunc(cmd, &ctx)
 		}
+	case constant.C2C_MESSAGE_CREATE:
+		raw := payload.Data.Content
+		payload.Data.Content = strings.TrimSpace(payload.Data.Content)
+		if payload.Data.Content == "" {
+			return
+		}
+
+		prefix := strings.Fields(payload.Data.Content)[0]
+		cmd, ok := plugin.GetCommand(prefix)
+		if !ok {
+			return
+		}
+		if !cmd.Role.CanUse(constant.RoleMember) {
+			log.Printf("私聊用户%v无权限使用%v指令", payload.Data.Author.UserOpenID, cmd.Prefix)
+			return
+		}
+
+		var parsed any
+		if cmd.ParserTarget != nil {
+			result := reflect.New(cmd.ParserTarget)
+			if err := cmd.Parser.Parse(payload.Data.Content, result.Interface()); err != nil {
+				return
+			}
+			parsed = result.Interface()
+		} else {
+			var result string
+			if err := cmd.Parser.Parse(payload.Data.Content, &result); err != nil {
+				return
+			}
+			parsed = result
+		}
+
+		ctx := context.MessageContext{
+			Parsed: parsed,
+			UserMessage: message.UserMessage{
+				Content: payload.Data.Content,
+			},
+			Raw: raw,
+		}
+		ctx.Init(payload.Data.Id, payload.ID, client)
+		ctx.BindStorage(cmd.PluginId, cmd.Prefix)
+		ctx.SetUserId(payload.Data.Author.UserOpenID)
+		ctx.SetMessageOrigin(constant.PrivateMessage)
+		go messageRecoveryFunc(cmd, &ctx)
 	case constant.INTERACTION_CREATE:
 		data := payload.Data.Callback.Resolved.ButtonData
 		buttonId := payload.Data.Callback.Resolved.ButtonId

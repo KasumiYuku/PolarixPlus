@@ -21,9 +21,13 @@ type PrasedData struct {
 	Content     string `json:"content"`
 	GroupOpenID string `json:"group_openid"`
 	Author      struct {
-		UnionID  string                `json:"union_openid"`
-		Role     constant.RoleRequired `json:"member_role"`
-		Username string                `json:"username"`
+		ID           string                `json:"id"`
+		UserOpenID   string                `json:"user_openid"`
+		MemberOpenID string                `json:"member_openid"`
+		UnionID      string                `json:"union_openid"`
+		Role         constant.RoleRequired `json:"member_role"`
+		Username     string                `json:"username"`
+		Bot          bool                  `json:"bot"`
 	} `json:"author"`
 	// 用于 Op=13 时的网络探测数据结构
 	PlainToken string `json:"plain_token"`

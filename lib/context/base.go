@@ -1,6 +1,7 @@
 package context
 
 import (
+	"Plrx/lib/constant"
 	"Plrx/lib/qqapi"
 	"Plrx/lib/requests"
 	"Plrx/lib/storage"
@@ -37,4 +38,8 @@ func (context *Context) SetGroupId(id string) {
 
 func (context *Context) SetUserId(id string) {
 	context.MessageManager.UserId = id
+}
+
+func (context *Context) SetMessageOrigin(origin constant.MessageOrigin) {
+	context.MessageManager.Target = origin
 }

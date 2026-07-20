@@ -12,6 +12,7 @@ type MessageManager struct {
 	EventId   string
 	GroupId   string
 	UserId    string
+	Target    constant.MessageOrigin
 	Qapi      *qqapi.Client
 	ref       *message.MsgRef
 }
@@ -24,6 +25,7 @@ func (manager *MessageManager) baseStruct() *message.Message {
 		Qapi:    manager.Qapi,
 		GroupId: manager.GroupId,
 		UserId:  manager.UserId,
+		Target:  manager.Target,
 	}
 	// 确保引用的是同一个计数器
 	if manager.ref == nil {
