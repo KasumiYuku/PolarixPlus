@@ -34,6 +34,14 @@ func init() {
 		Handle:   getUid,
 	})
 
+	commands = append(commands, &plugin.Command{
+		Prefix:         "/gid",
+		Role:           constant.RoleMember,
+		Describe:       "获取群ID",
+		Handle:         getGid,
+		DisablePrivate: true,
+	})
+
 	plugin.Register(&plugin.Plugin{
 		Id:       "echo",
 		Commands: commands,
@@ -83,5 +91,10 @@ func getUid(context *context.MessageContext) error {
 	if err != nil {
 		return err
 	}
+	return md.Send()
+}
+
+func getGid(context *context.MessageContext) error {
+	md := context.Markdown(fmt.Sprintf("## 当前群ID\n```\n%v\n```", context.GroupId))
 	return md.Send()
 }
