@@ -120,5 +120,5 @@ func (c *Client) InteracteCallback(eventId string) error {
 	if err != nil {
 		return err
 	}
-	return c.Request.Put(fmt.Sprintf("%v/interactions/%v", c.ProxyAPI, eventId), nil, header)
+	return c.Request.Put(fmt.Sprintf("%v/interactions/%v", c.ProxyAPI, eventId), nil, nil, header)
 }
