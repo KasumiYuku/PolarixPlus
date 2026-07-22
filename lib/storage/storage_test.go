@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -119,5 +121,43 @@ func TestClearOnlyAffectsCurrentNamespace(t *testing.T) {
 	}
 	if firstExists || !secondExists {
 		t.Fatalf("namespace existence = (%v, %v), want (false, true)", firstExists, secondExists)
+	}
+}
+
+func TestConcurrentAccess(t *testing.T) {
+	openTestStorage(t)
+	store := Global()
+	const workers = 32
+	const rounds = 50
+
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			key := fmt.Sprintf("k-%d", id)
+			for r := 0; r < rounds; r++ {
+				if err := store.Set(key, r); err != nil {
+					errCh <- err
+					return
+				}
+				var got int
+				found, err := store.Get(key, &got)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				if !found {
+					errCh <- fmt.Errorf("key %s missing after set", key)
+					return
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent access error: %v", err)
 	}
 }

@@ -19,8 +19,9 @@ const (
 )
 
 var (
-	db   *sql.DB
-	dbMu sync.RWMutex
+	db      *sql.DB
+	dbMu    sync.RWMutex
+	queryMu sync.RWMutex
 )
 
 // Store is a key-value namespace bound to a specific data scope.
@@ -41,9 +42,28 @@ func Open(path string) error {
 	if err != nil {
 		return fmt.Errorf("open sqlite database: %w", err)
 	}
+
+	// SQLite 写锁全局唯一: 限制单连接, 避免多连接 SQLITE_BUSY
+	opened.SetMaxOpenConns(1)
+	opened.SetMaxIdleConns(1)
+	opened.SetConnMaxLifetime(0)
+
 	if err = opened.Ping(); err != nil {
 		opened.Close()
 		return fmt.Errorf("connect to sqlite database: %w", err)
+	}
+
+	if _, err = opened.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+		opened.Close()
+		return fmt.Errorf("enable wal mode: %w", err)
+	}
+	if _, err = opened.Exec(`PRAGMA busy_timeout=10000`); err != nil {
+		opened.Close()
+		return fmt.Errorf("set busy timeout: %w", err)
+	}
+	if _, err = opened.Exec(`PRAGMA synchronous=NORMAL`); err != nil {
+		opened.Close()
+		return fmt.Errorf("set synchronous mode: %w", err)
 	}
 
 	if _, err = opened.Exec(`
@@ -110,6 +130,9 @@ func (store *Store) Set(key string, value any) error {
 		return err
 	}
 
+	queryMu.Lock()
+	defer queryMu.Unlock()
+
 	_, err = database.Exec(`
 		INSERT INTO kv_data (scope, namespace, key, value, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -135,6 +158,10 @@ func (store *Store) Get(key string, target any) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	queryMu.RLock()
+	defer queryMu.RUnlock()
+
 	var encoded []byte
 	err = database.QueryRow(
 		"SELECT value FROM kv_data WHERE scope = ? AND namespace = ? AND key = ?",
@@ -161,6 +188,9 @@ func (store *Store) Has(key string) (bool, error) {
 		return false, err
 	}
 
+	queryMu.RLock()
+	defer queryMu.RUnlock()
+
 	var exists int
 	err = database.QueryRow(
 		"SELECT EXISTS(SELECT 1 FROM kv_data WHERE scope = ? AND namespace = ? AND key = ?)",
@@ -180,6 +210,10 @@ func (store *Store) Delete(key string) error {
 	if err != nil {
 		return err
 	}
+
+	queryMu.Lock()
+	defer queryMu.Unlock()
+
 	if _, err = database.Exec(
 		"DELETE FROM kv_data WHERE scope = ? AND namespace = ? AND key = ?",
 		store.scope, store.namespace, key,
@@ -197,6 +231,10 @@ func (store *Store) Clear() error {
 	if err != nil {
 		return err
 	}
+
+	queryMu.Lock()
+	defer queryMu.Unlock()
+
 	if _, err = database.Exec(
 		"DELETE FROM kv_data WHERE scope = ? AND namespace = ?",
 		store.scope, store.namespace,
