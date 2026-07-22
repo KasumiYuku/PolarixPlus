@@ -67,8 +67,16 @@ func (manager *MessageManager) Markdown(content string) *message.MarkdownMessage
 
 // 填充Markdown模板并构造Markdown消息
 func (manager *MessageManager) MarkdownTemplate(id string, args *templates.Args) (*message.MarkdownMessage, error) {
+	var content string
+	var err error
+	if args == nil {
+		// args = &templates.Args{}
+		content, err = templates.FillMarkdownTemplate(id, templates.Args{})
+	} else {
+		content, err = templates.FillMarkdownTemplate(id, *args)
+
+	}
 	// 填充Markdown模板
-	content, err := templates.FillMarkdownTemplate(id, *args)
 	if err != nil {
 		return nil, err
 	}
