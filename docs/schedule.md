@@ -113,11 +113,36 @@ panic 会被调度器捕获并记录。
 | `PluginId` | 插件 Id |
 | `FiredAt` | 本次触发时间 |
 | `Text` / `Markdown` / `MarkdownTemplate` | 构造消息 (继承 `MessageManager`) |
-| `GlobalStorage` / `PluginStorage` / `CommandStorage` | KV 存储 |
+| `GlobalStorage` | 全局 KV |
+| `PluginStorage` | 插件级 KV (`PluginId`) |
+| `CommandStorage` | 任务级 KV, 命名空间 `schedule:{JobId}` |
+| `GroupStorage` | 群级 KV; **Job 设置了 `GroupId` (或回调内 `SetGroupId`) 时自动绑定** |
+| `UserStorage` | 用户级 KV; **Job 设置了 `UserId` (或回调内 `SetUserId`) 时自动绑定** |
 | `Request` | HTTP 客户端 |
-| `SetGroupId` / `SetUserId` / `SetMessageOrigin` | 设置推送目标 |
+| `SetGroupId` / `SetUserId` / `SetMessageOrigin` | 设置推送目标 (并同步绑定对应 storage) |
 
-`CommandStorage` 命名空间为: `schedule:{JobId}` (在 `PluginId` 下绑定)。
+#### Storage 绑定规则
+
+| 时机 | 绑定结果 |
+|------|----------|
+| 触发时 `PluginId` 非空 | `PluginStorage` + `CommandStorage` (`schedule:{JobId}`) |
+| Job / 回调设置 `GroupId` | `GroupStorage = storage.Group(groupId)` |
+| Job / 回调设置 `UserId` | `UserStorage = storage.User(userId)` |
+| 未设置对应 Id | 对应 `*Storage` 为 `nil`, 使用前请判断 |
+
+```go
+func onTick(ctx *context.ScheduleContext) error {
+	// Job 注册时写了 GroupId, 此处可直接用群存储
+	if ctx.GroupStorage != nil {
+		var last string
+		ctx.GroupStorage.Get("last_ping", &last)
+		_ = ctx.GroupStorage.Set("last_ping", ctx.FiredAt.Format(time.RFC3339))
+	}
+	msg := ctx.Text("tick")
+	msg.SetInitiativeMessage()
+	return msg.Send()
+}
+```
 
 > 定时任务没有用户 `msg_id`。主动发消息请调用  
 > `msg.SetInitiativeMessage()` 再 `Send()`。  
