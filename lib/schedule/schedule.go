@@ -31,18 +31,29 @@ type registeredJob struct {
 	job      *Job
 	cron     *cronExpr
 	lastFire time.Time // cron: 上次触发的分钟刻度
+	paused   bool
+	cancel   chan struct{}
+	stopOnce sync.Once
+}
+
+func (rj *registeredJob) stop() {
+	rj.stopOnce.Do(func() {
+		close(rj.cancel)
+	})
 }
 
 var (
-	jobs     []*registeredJob
-	jobsLock sync.RWMutex
-	client   *qqapi.Client
-	stopCh   chan struct{}
-	started  bool
-	startMu  sync.Mutex
+	jobs       []*registeredJob
+	jobsLock   sync.RWMutex
+	client     *qqapi.Client
+	stopCh     chan struct{}
+	started    bool
+	cronLoopOn bool
+	startMu    sync.Mutex
 )
 
 // Register 注册定时任务 (插件 init 中调用, 风格同 buttons.RegisterCallbackFunc)
+// 若 Id 已存在则覆盖旧任务 (旧任务会被取消)
 func Register(job *Job) {
 	if job == nil {
 		log.Printf("[schedule] 忽略空 Job")
@@ -61,7 +72,10 @@ func Register(job *Job) {
 		return
 	}
 
-	rj := &registeredJob{job: job}
+	rj := &registeredJob{
+		job:    job,
+		cancel: make(chan struct{}),
+	}
 	if job.Interval <= 0 {
 		expr, err := parseCron(job.Cron)
 		if err != nil {
@@ -72,18 +86,107 @@ func Register(job *Job) {
 	}
 
 	jobsLock.Lock()
-	defer jobsLock.Unlock()
+	replaced := false
 	for i, existing := range jobs {
 		if existing.job.Id == job.Id {
 			log.Printf("[schedule] 警告: Job Id=%v 已存在, 覆盖旧任务", job.Id)
+			existing.stop()
 			jobs[i] = rj
-			return
+			replaced = true
+			break
 		}
 	}
-	jobs = append(jobs, rj)
+	if !replaced {
+		jobs = append(jobs, rj)
+	}
+	jobsLock.Unlock()
+
+	// 调度器已启动时, 为新任务拉起对应循环
+	startMu.Lock()
+	running := started
+	needCron := running && job.Interval <= 0 && !cronLoopOn
+	if needCron {
+		cronLoopOn = true
+	}
+	startMu.Unlock()
+	if !running {
+		return
+	}
+	if job.Interval > 0 {
+		go runInterval(rj)
+	} else if needCron {
+		go runCronLoop()
+	}
 }
 
-// GetJobCount 已注册任务数
+// Cancel 取消并移除任务, 不可恢复. 返回是否找到该任务
+func Cancel(id string) bool {
+	jobsLock.Lock()
+	defer jobsLock.Unlock()
+	for i, rj := range jobs {
+		if rj.job.Id == id {
+			rj.stop()
+			jobs = append(jobs[:i], jobs[i+1:]...)
+			log.Printf("[schedule] 已取消 Job %v", id)
+			return true
+		}
+	}
+	return false
+}
+
+// Pause 暂停任务 (保留注册, 到点不触发). 返回是否找到该任务
+func Pause(id string) bool {
+	jobsLock.Lock()
+	defer jobsLock.Unlock()
+	for _, rj := range jobs {
+		if rj.job.Id == id {
+			rj.paused = true
+			log.Printf("[schedule] 已暂停 Job %v", id)
+			return true
+		}
+	}
+	return false
+}
+
+// Resume 恢复已暂停的任务. 返回是否找到该任务
+func Resume(id string) bool {
+	jobsLock.Lock()
+	defer jobsLock.Unlock()
+	for _, rj := range jobs {
+		if rj.job.Id == id {
+			rj.paused = false
+			log.Printf("[schedule] 已恢复 Job %v", id)
+			return true
+		}
+	}
+	return false
+}
+
+// IsPaused 查询任务是否暂停. exists 表示任务是否仍注册
+func IsPaused(id string) (paused bool, exists bool) {
+	jobsLock.RLock()
+	defer jobsLock.RUnlock()
+	for _, rj := range jobs {
+		if rj.job.Id == id {
+			return rj.paused, true
+		}
+	}
+	return false, false
+}
+
+// Exists 任务是否仍注册 (未 Cancel)
+func Exists(id string) bool {
+	jobsLock.RLock()
+	defer jobsLock.RUnlock()
+	for _, rj := range jobs {
+		if rj.job.Id == id {
+			return true
+		}
+	}
+	return false
+}
+
+// GetJobCount 已注册任务数 (含暂停中的)
 func GetJobCount() int {
 	jobsLock.RLock()
 	defer jobsLock.RUnlock()
@@ -120,12 +223,13 @@ func Start(c *qqapi.Client) {
 		}
 	}
 	if cronN > 0 {
+		cronLoopOn = true
 		go runCronLoop()
 	}
 	log.Printf("[schedule] 调度器已启动 (interval=%d, cron=%d)", intervalN, cronN)
 }
 
-// Stop 停止调度器
+// Stop 停止整个调度器 (所有任务循环退出, 注册表保留)
 func Stop() {
 	startMu.Lock()
 	defer startMu.Unlock()
@@ -134,13 +238,14 @@ func Stop() {
 	}
 	close(stopCh)
 	started = false
+	cronLoopOn = false
 	log.Printf("[schedule] 调度器已停止")
 }
 
 func runInterval(rj *registeredJob) {
 	job := rj.job
 	if job.Immediate {
-		fire(job)
+		tryFire(rj)
 	}
 	ticker := time.NewTicker(job.Interval)
 	defer ticker.Stop()
@@ -148,8 +253,10 @@ func runInterval(rj *registeredJob) {
 		select {
 		case <-stopCh:
 			return
+		case <-rj.cancel:
+			return
 		case <-ticker.C:
-			fire(job)
+			tryFire(rj)
 		}
 	}
 }
@@ -167,10 +274,10 @@ func runCronLoop() {
 		case t := <-ticker.C:
 			t = t.Local()
 			minuteKey := t.Truncate(time.Minute)
-			var toFire []*Job
+			var toFire []*registeredJob
 			jobsLock.Lock()
 			for _, rj := range jobs {
-				if rj.cron == nil {
+				if rj.cron == nil || rj.paused {
 					continue
 				}
 				if !rj.cron.match(t) {
@@ -180,17 +287,35 @@ func runCronLoop() {
 					continue
 				}
 				rj.lastFire = minuteKey
-				toFire = append(toFire, rj.job)
+				toFire = append(toFire, rj)
 			}
 			jobsLock.Unlock()
-			for _, job := range toFire {
-				go fire(job)
+			for _, rj := range toFire {
+				go fire(rj)
 			}
 		}
 	}
 }
 
-func fire(job *Job) {
+func tryFire(rj *registeredJob) {
+	jobsLock.RLock()
+	if rj.paused {
+		jobsLock.RUnlock()
+		return
+	}
+	// 已被 Cancel 时 cancel channel 已关闭
+	select {
+	case <-rj.cancel:
+		jobsLock.RUnlock()
+		return
+	default:
+	}
+	jobsLock.RUnlock()
+	fire(rj)
+}
+
+func fire(rj *registeredJob) {
+	job := rj.job
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[schedule] Job %v (plugin=%v) panic: %v", job.Id, job.PluginId, r)
