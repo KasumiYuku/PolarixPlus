@@ -85,6 +85,20 @@ func scoreHandle(ctx *context.MessageContext) error {
 
 应用启动时调用 `storage.Open`, 退出时调用 `storage.Close`。数据库文件及 WAL 临时文件 (`.db` / `.db-shm` / `.db-wal`) 已加入 `.gitignore`。
 
+### 插件 `init()` 中使用
+
+插件包的 `init()` 会在 `main` 的 `storage.Open` **之前**执行。存储层会在首次读写时自动打开数据库 (默认 `bot.db`), 因此可直接在 `init()` 里 `Get`/`Set`:
+
+```go
+func init() {
+	var enabled bool
+	found, err := storage.Global().Get("feature_x", &enabled)
+	// ...
+}
+```
+
+注意: 若 `config.json` 里 `database` 不是默认 `bot.db`, 请避免在 `init()` 中依赖自定义路径; 此时应把读库逻辑放到指令处理函数或 `main` 启动之后。
+
 ---
 
 ## Context 暴露的存储对象

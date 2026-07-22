@@ -16,10 +16,13 @@ const (
 	ScopeCommand = "command"
 	ScopeUser    = "user"
 	ScopeGroup   = "group"
+
+	defaultDBPath = "bot.db"
 )
 
 var (
 	db      *sql.DB
+	dbPath  = defaultDBPath
 	dbMu    sync.RWMutex
 	queryMu sync.RWMutex
 )
@@ -30,14 +33,45 @@ type Store struct {
 	namespace string
 }
 
+// Open opens the SQLite database at path.
+// Safe to call multiple times; if already open on the same path, it is a no-op.
+// Plugin init() may access storage before main calls Open; first access auto-opens default path.
 func Open(path string) error {
+	if path == "" {
+		path = defaultDBPath
+	}
+
 	dbMu.Lock()
 	defer dbMu.Unlock()
 
 	if db != nil {
-		return errors.New("storage is already open")
+		if dbPath == path {
+			return nil
+		}
+		if err := db.Close(); err != nil {
+			return fmt.Errorf("close previous sqlite database: %w", err)
+		}
+		db = nil
 	}
 
+	dbPath = path
+	return openLocked(path)
+}
+
+func Close() error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
+
+	if db == nil {
+		return nil
+	}
+	err := db.Close()
+	db = nil
+	dbPath = defaultDBPath
+	return err
+}
+
+func openLocked(path string) error {
 	opened, err := sql.Open("sqlite", path)
 	if err != nil {
 		return fmt.Errorf("open sqlite database: %w", err)
@@ -84,18 +118,6 @@ func Open(path string) error {
 	return nil
 }
 
-func Close() error {
-	dbMu.Lock()
-	defer dbMu.Unlock()
-
-	if db == nil {
-		return nil
-	}
-	err := db.Close()
-	db = nil
-	return err
-}
-
 func Global() *Store {
 	return &Store{scope: ScopeGlobal, namespace: ScopeGlobal}
 }
@@ -125,7 +147,7 @@ func (store *Store) Set(key string, value any) error {
 	if err != nil {
 		return fmt.Errorf("marshal storage value: %w", err)
 	}
-	database, err := currentDB()
+	database, err := ensureDB()
 	if err != nil {
 		return err
 	}
@@ -154,7 +176,7 @@ func (store *Store) Get(key string, target any) (bool, error) {
 		return false, errors.New("storage target cannot be nil")
 	}
 
-	database, err := currentDB()
+	database, err := ensureDB()
 	if err != nil {
 		return false, err
 	}
@@ -183,7 +205,7 @@ func (store *Store) Has(key string) (bool, error) {
 	if err := store.validate(key); err != nil {
 		return false, err
 	}
-	database, err := currentDB()
+	database, err := ensureDB()
 	if err != nil {
 		return false, err
 	}
@@ -206,7 +228,7 @@ func (store *Store) Delete(key string) error {
 	if err := store.validate(key); err != nil {
 		return err
 	}
-	database, err := currentDB()
+	database, err := ensureDB()
 	if err != nil {
 		return err
 	}
@@ -227,7 +249,7 @@ func (store *Store) Clear() error {
 	if store == nil || store.scope == "" || store.namespace == "" {
 		return errors.New("invalid storage namespace")
 	}
-	database, err := currentDB()
+	database, err := ensureDB()
 	if err != nil {
 		return err
 	}
@@ -254,11 +276,27 @@ func (store *Store) validate(key string) error {
 	return nil
 }
 
-func currentDB() (*sql.DB, error) {
+// ensureDB returns an open database, auto-opening default path if needed.
+// This allows plugin init() to use storage before main() calls Open.
+func ensureDB() (*sql.DB, error) {
 	dbMu.RLock()
-	defer dbMu.RUnlock()
-	if db == nil {
-		return nil, errors.New("storage is not open")
+	if db != nil {
+		database := db
+		dbMu.RUnlock()
+		return database, nil
+	}
+	dbMu.RUnlock()
+
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	if db != nil {
+		return db, nil
+	}
+	if dbPath == "" {
+		dbPath = defaultDBPath
+	}
+	if err := openLocked(dbPath); err != nil {
+		return nil, err
 	}
 	return db, nil
 }

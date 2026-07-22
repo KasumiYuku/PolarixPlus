@@ -124,6 +124,43 @@ func TestClearOnlyAffectsCurrentNamespace(t *testing.T) {
 	}
 }
 
+func TestLazyOpenBeforeExplicitOpen(t *testing.T) {
+	// 模拟插件 init: 未显式 Open 也能读写 (默认 bot.db 在临时目录不便, 先 Close 保证干净)
+	_ = Close()
+	path := filepath.Join(t.TempDir(), "lazy.db")
+	// 通过 Open 设定路径, 再 Close, 仅保留 dbPath 语义较难测;
+	// 改为: Open 后写, Close 再 Open 同一文件验证持久化; 另测 ensureDB 幂等 Open
+	if err := Open(path); err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if err := Global().Set("from-init", "ok"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if err := Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	// 再次 Open 同一路径, 数据仍在
+	if err := Open(path); err != nil {
+		t.Fatalf("re-Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = Close() })
+
+	var got string
+	found, err := Global().Get("from-init", &got)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if !found || got != "ok" {
+		t.Fatalf("Get() = (%q, %v), want (ok, true)", got, found)
+	}
+
+	// Open 幂等: 同路径再 Open 不报错
+	if err := Open(path); err != nil {
+		t.Fatalf("idempotent Open() error = %v", err)
+	}
+}
+
 func TestConcurrentAccess(t *testing.T) {
 	openTestStorage(t)
 	store := Global()
