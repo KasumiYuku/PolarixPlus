@@ -133,7 +133,15 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		ctx.Init(payload.ID, client)
 		ctx.ButtonId = buttonId
 		ctx.Data = data
-		ctx.GroupId = payload.Data.GroupOpenID
+		ctx.SetGroupId(payload.Data.GroupOpenID)
+		userID := payload.Data.Author.MemberOpenID
+		if userID == "" {
+			userID = payload.Data.Author.UserOpenID
+		}
+		if userID == "" {
+			userID = payload.Data.Author.UnionID
+		}
+		ctx.SetUserId(userID)
 		go callbackHandleFunc(callbackFunc, ctx)
 	}
 }

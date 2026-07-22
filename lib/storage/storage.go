@@ -14,6 +14,8 @@ const (
 	ScopeGlobal  = "global"
 	ScopePlugin  = "plugin"
 	ScopeCommand = "command"
+	ScopeUser    = "user"
+	ScopeGroup   = "group"
 )
 
 var (
@@ -84,6 +86,14 @@ func Plugin(pluginID string) *Store {
 
 func Command(pluginID, commandID string) *Store {
 	return &Store{scope: ScopeCommand, namespace: pluginID + ":" + commandID}
+}
+
+func User(userID string) *Store {
+	return &Store{scope: ScopeUser, namespace: userID}
+}
+
+func Group(groupID string) *Store {
+	return &Store{scope: ScopeGroup, namespace: groupID}
 }
 
 func (store *Store) Set(key string, value any) error {

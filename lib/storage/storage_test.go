@@ -72,6 +72,10 @@ func TestScopesAreIsolated(t *testing.T) {
 		Plugin("example"),
 		Command("example", "/run"),
 		Command("example", "/run child"),
+		User("user-a"),
+		User("user-b"),
+		Group("group-a"),
+		Group("group-b"),
 	}
 	for index, store := range stores {
 		if err := store.Set("shared", index); err != nil {

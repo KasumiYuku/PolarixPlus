@@ -13,6 +13,8 @@ type Context struct {
 	GlobalStorage  *storage.Store
 	PluginStorage  *storage.Store
 	CommandStorage *storage.Store
+	UserStorage    *storage.Store
+	GroupStorage   *storage.Store
 }
 
 // 初始化Context对象及MessageManager对象
@@ -34,10 +36,16 @@ func (context *Context) BindStorage(pluginID, commandID string) {
 
 func (context *Context) SetGroupId(id string) {
 	context.MessageManager.GroupId = id
+	if id != "" {
+		context.GroupStorage = storage.Group(id)
+	}
 }
 
 func (context *Context) SetUserId(id string) {
 	context.MessageManager.UserId = id
+	if id != "" {
+		context.UserStorage = storage.User(id)
+	}
 }
 
 func (context *Context) SetMessageOrigin(origin constant.MessageOrigin) {
