@@ -7,6 +7,7 @@ import (
 	"Plrx/lib/plugin"
 	"Plrx/lib/qqapi"
 	"Plrx/lib/requests"
+	"Plrx/lib/schedule"
 	"Plrx/lib/storage"
 	"Plrx/lib/structers"
 	"Plrx/lib/templates"
@@ -38,6 +39,7 @@ func main() {
 	}()
 	client := qqapi.Init(appConfig.AppId, appConfig.AppSecret, appConfig.ProxyAPI, requestsClient)
 	plugins_push.SetClient(&client)
+	schedule.Start(&client)
 	r := gin.Default()
 
 	// 主动推送接口 (不经过QQ签名校验)
@@ -88,5 +90,6 @@ func main() {
 	log.Printf("Server running on %v", appConfig.Port)
 	log.Printf("注册了%v个Markdown模板", templates.GetMarkdownTemplateCount())
 	log.Printf("注册了%v个指令", plugin.GetCommandCount())
+	log.Printf("注册了%v个定时任务", schedule.GetJobCount())
 	r.Run(fmt.Sprintf(":%v", appConfig.Port))
 }
