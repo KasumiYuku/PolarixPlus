@@ -5,7 +5,6 @@ import (
 	"Plrx/lib/context"
 	"Plrx/lib/parser"
 	"Plrx/lib/utils"
-	"log"
 	"strings"
 	"sync"
 )
@@ -26,6 +25,9 @@ func subCommandHandle(command *Command, pluginId string) {
 	command.PluginId = pluginId
 	// 递增指令计数
 	commandCount++
+	if command.Handle == nil {
+		command.Handle = defaultCommandHandle
+	}
 	if len(command.SubCommand) > 0 {
 		// 处理回调函数
 		command.SubCommandFallback = command.Handle
@@ -77,12 +79,9 @@ func subCommandHandleFunc(context *context.MessageContext) error {
 	}
 	commandPath := currentCmd.Prefix
 	context.BindStorage(currentCmd.PluginId, commandPath)
-	log.Printf("正在处理Prefix为 %v 的指令的子指令", currentCmd.Prefix)
 	subCommandPrefixIndex := 1 // 子指令前缀的索引位置
 	for {
-		log.Printf("正在匹配参数位: %v", subCommandPrefixIndex)
 		if currentCmd.Handle == nil || len(currentCmd.SubCommand) == 0 {
-			log.Printf("指令 %v 已经是叶子指令, 执行处理函数", currentCmd.Prefix)
 			// 叶子指令
 			return currentCmd.Handle(context)
 		}
