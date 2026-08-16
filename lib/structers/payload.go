@@ -1,6 +1,9 @@
 package structers
 
-import "Plrx/lib/constant"
+import (
+	"Plrx/lib/constant"
+	"Plrx/lib/message"
+)
 
 // 推送内容解析
 type Payload struct {
@@ -17,9 +20,10 @@ type CallbackData struct {
 }
 
 type PrasedData struct {
-	Id          string `json:"id"`
-	Content     string `json:"content"`
-	GroupOpenID string `json:"group_openid"`
+	Id          string               `json:"id"`
+	Content     string               `json:"content"`
+	GroupOpenID string               `json:"group_openid"`
+	Attachments []message.Attachment `json:"attachments"`
 	Author      struct {
 		ID           string                `json:"id"`
 		UserOpenID   string                `json:"user_openid"`

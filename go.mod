@@ -2,7 +2,10 @@ module Plrx
 
 go 1.25.4
 
-require github.com/gin-gonic/gin v1.12.0
+require (
+	github.com/gin-gonic/gin v1.12.0
+	modernc.org/sqlite v1.54.0
+)
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
@@ -41,5 +44,4 @@ require (
 	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.54.0 // indirect
 )

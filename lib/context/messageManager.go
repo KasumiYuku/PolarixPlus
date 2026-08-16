@@ -65,6 +65,19 @@ func (manager *MessageManager) Markdown(content string) *message.MarkdownMessage
 	return &msg
 }
 
+// Media creates a rich-media message from file_info returned by QQ's upload API.
+func (manager *MessageManager) Media(fileInfo string) *message.MediaMessage {
+	msg := &message.MediaMessage{
+		Message: manager.baseStruct(),
+		Media: message.MediaContent{
+			FileInfo: fileInfo,
+		},
+	}
+	msg.Type = constant.Media
+	msg.Init()
+	return msg
+}
+
 // 填充Markdown模板并构造Markdown消息
 func (manager *MessageManager) MarkdownTemplate(id string, args *templates.Args) (*message.MarkdownMessage, error) {
 	var content string

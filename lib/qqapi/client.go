@@ -1,12 +1,19 @@
 package qqapi
 
 import (
+	"Plrx/lib/constant"
 	"Plrx/lib/requests"
+	"encoding/base64"
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
 )
+
+type mediaUploadResponse struct {
+	FileInfo string `json:"file_info"`
+}
 
 type Client struct {
 	ProxyAPI    string
@@ -112,6 +119,42 @@ func (c *Client) SendPrivateMessage(data []byte, userId string) error {
 		return err
 	}
 	return nil
+}
+
+// UploadImage uploads a local image to QQ and returns file_info for a media message.
+func (c *Client) UploadImage(target constant.MessageOrigin, groupID, userID, filePath string) (string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read image for upload: %w", err)
+	}
+	header, err := c.generateHeader()
+	if err != nil {
+		return "", err
+	}
+
+	var endpoint string
+	switch target {
+	case constant.GroupMessage:
+		endpoint = fmt.Sprintf("%v/v2/groups/%v/files", c.ProxyAPI, groupID)
+	case constant.PrivateMessage:
+		endpoint = fmt.Sprintf("%v/v2/users/%v/files", c.ProxyAPI, userID)
+	default:
+		return "", fmt.Errorf("unknown message target type: %v", target)
+	}
+
+	var result mediaUploadResponse
+	err = c.Request.Post(endpoint, map[string]any{
+		"file_type":    1,
+		"file_data":    base64.StdEncoding.EncodeToString(data),
+		"srv_send_msg": false,
+	}, &result, header)
+	if err != nil {
+		return "", fmt.Errorf("upload image to QQ: %w", err)
+	}
+	if result.FileInfo == "" {
+		return "", fmt.Errorf("QQ media upload returned empty file_info")
+	}
+	return result.FileInfo, nil
 }
 
 // 回复回调按钮

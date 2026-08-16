@@ -9,6 +9,7 @@ import (
 	"Plrx/lib/qqapi"
 	"Plrx/lib/structers"
 	"Plrx/lib/utils"
+	"fmt"
 	"log"
 	"reflect"
 	"strings"
@@ -30,8 +31,35 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		cmd, ok := plugin.GetCommand(prefix)
 		if ok {
 			// log.Printf("捕获到%v指令, 来自插件: %v", cmd.Prefix, cmd.PluginId)
+			userID := payload.Data.Author.MemberOpenID
+			if userID == "" {
+				userID = payload.Data.Author.UnionID
+			}
+			ctx := context.MessageContext{
+				UserMessage: message.UserMessage{
+					Content:     payload.Data.Content,
+					Attachments: payload.Data.Attachments,
+				},
+				Raw: raw,
+			}
+			ctx.Init(payload.Data.Id, payload.ID, client)
+			ctx.BindStorage(cmd.PluginId, cmd.Prefix)
+			ctx.SetGroupId(payload.Data.GroupOpenID)
+			ctx.SetUserId(userID)
+			ctx.SetMessageOrigin(constant.GroupMessage)
+			targetCommand, commandPath := plugin.ResolveCommand(cmd, payload.Data.Content)
 			if !cmd.Role.CanUse(payload.Data.Author.Role) {
 				log.Printf("用户%v无权限使用%v指令", payload.Data.Author.Username, cmd.Prefix)
+				permissionDenied(cmd, &ctx)
+				return
+			}
+			if targetCommand != cmd && !targetCommand.Role.CanUse(payload.Data.Author.Role) {
+				log.Printf("用户%v无权限使用%v指令", payload.Data.Author.Username, commandPath)
+				permissionDenied(targetCommand, &ctx)
+				return
+			}
+			if !plugin.CanUse(cmd.PluginId, commandPath, userID, payload.Data.GroupOpenID) {
+				permissionDenied(targetCommand, &ctx)
 				return
 			}
 
@@ -52,29 +80,9 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 				}
 				parsed = result
 			}
-			// 构建上下文对象
-			ctx := context.MessageContext{
-				Parsed: parsed,
-				UserMessage: message.UserMessage{
-					Content: payload.Data.Content,
-				},
-				Raw: raw,
-			}
-			// 初始化消息管理器
-			metaContext := &context.Context{}
-			metaContext.Init(payload.Data.Id, payload.ID, client)
-			ctx.Context = metaContext
-			ctx.Init(payload.Data.Id, payload.ID, client)
-			ctx.BindStorage(cmd.PluginId, cmd.Prefix)
-			ctx.SetGroupId(payload.Data.GroupOpenID)
-			userID := payload.Data.Author.MemberOpenID
-			if userID == "" {
-				userID = payload.Data.Author.UnionID
-			}
-			ctx.SetUserId(userID)
-			ctx.SetMessageOrigin(constant.GroupMessage)
+			ctx.Parsed = parsed
 			// err := cmd.Handle(&ctx)
-			go messageRecoveryFunc(cmd, &ctx)
+			go messageRecoveryFunc(cmd, targetCommand, &ctx)
 		}
 	case constant.C2C_MESSAGE_CREATE:
 		raw := payload.Data.Content
@@ -88,7 +96,32 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		if !ok {
 			return
 		}
-		if cmd.DisablePrivate {
+		ctx := context.MessageContext{
+			UserMessage: message.UserMessage{
+				Content:     payload.Data.Content,
+				Attachments: payload.Data.Attachments,
+			},
+			Raw: raw,
+		}
+		ctx.Init(payload.Data.Id, payload.ID, client)
+		ctx.BindStorage(cmd.PluginId, cmd.Prefix)
+		ctx.SetUserId(payload.Data.Author.UserOpenID)
+		ctx.SetMessageOrigin(constant.PrivateMessage)
+		targetCommand, commandPath := plugin.ResolveCommand(cmd, payload.Data.Content)
+		if !cmd.Role.CanUse(payload.Data.Author.Role) {
+			permissionDenied(cmd, &ctx)
+			return
+		}
+		if targetCommand != cmd && !targetCommand.Role.CanUse(payload.Data.Author.Role) {
+			permissionDenied(targetCommand, &ctx)
+			return
+		}
+		if cmd.DisablePrivate || targetCommand.DisablePrivate {
+			permissionDenied(targetCommand, &ctx)
+			return
+		}
+		if !plugin.CanUse(cmd.PluginId, commandPath, payload.Data.Author.UserOpenID, "") {
+			permissionDenied(targetCommand, &ctx)
 			return
 		}
 
@@ -107,18 +140,8 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			parsed = result
 		}
 
-		ctx := context.MessageContext{
-			Parsed: parsed,
-			UserMessage: message.UserMessage{
-				Content: payload.Data.Content,
-			},
-			Raw: raw,
-		}
-		ctx.Init(payload.Data.Id, payload.ID, client)
-		ctx.BindStorage(cmd.PluginId, cmd.Prefix)
-		ctx.SetUserId(payload.Data.Author.UserOpenID)
-		ctx.SetMessageOrigin(constant.PrivateMessage)
-		go messageRecoveryFunc(cmd, &ctx)
+		ctx.Parsed = parsed
+		go messageRecoveryFunc(cmd, targetCommand, &ctx)
 	case constant.INTERACTION_CREATE:
 		data := payload.Data.Callback.Resolved.ButtonData
 		buttonId := payload.Data.Callback.Resolved.ButtonId
@@ -146,14 +169,44 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 	}
 }
 
-func messageRecoveryFunc(cmd *plugin.Command, context *context.MessageContext) {
+func messageRecoveryFunc(cmd, lifecycleCommand *plugin.Command, context *context.MessageContext) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("在执行指令%v (插件: %v)时出现panic: %v", cmd.Prefix, cmd.PluginId, r)
+			invokeErrorHook(cmd, lifecycleCommand, context, fmt.Errorf("command panic: %v", r))
 		}
 	}()
 	if err := cmd.Handle(context); err != nil {
 		log.Printf("在执行指令%v (插件: %v)时出现error: %v", cmd.Prefix, cmd.PluginId, err)
+		invokeErrorHook(cmd, lifecycleCommand, context, err)
+	}
+}
+
+func invokeErrorHook(cmd, lifecycleCommand *plugin.Command, ctx *context.MessageContext, commandErr error) {
+	if lifecycleCommand.HandleError == nil {
+		return
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Printf("在处理指令%v (插件: %v)的error时出现panic: %v", cmd.Prefix, cmd.PluginId, recovered)
+		}
+	}()
+	if handleErr := lifecycleCommand.HandleError(ctx, commandErr); handleErr != nil {
+		log.Printf("在处理指令%v (插件: %v)的error时再次出现error: %v", cmd.Prefix, cmd.PluginId, handleErr)
+	}
+}
+
+func permissionDenied(cmd *plugin.Command, ctx *context.MessageContext) {
+	if cmd.PermissionDenied == nil {
+		return
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Printf("在执行指令%v (插件: %v)的权限拒绝处理函数时出现panic: %v", cmd.Prefix, cmd.PluginId, recovered)
+		}
+	}()
+	if err := cmd.PermissionDenied(ctx); err != nil {
+		log.Printf("在执行指令%v (插件: %v)的权限拒绝处理函数时出现error: %v", cmd.Prefix, cmd.PluginId, err)
 	}
 }
 

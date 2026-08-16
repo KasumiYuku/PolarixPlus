@@ -15,4 +15,5 @@ type MessageType uint8
 const (
 	PlainText MessageType = 0
 	Markdown  MessageType = 2
+	Media     MessageType = 7
 )

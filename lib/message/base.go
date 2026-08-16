@@ -34,7 +34,17 @@ func (msg *Message) InitRef() *Message {
 }
 
 type UserMessage struct {
-	Content string
+	Content     string
+	Attachments []Attachment
+}
+
+type Attachment struct {
+	ContentType string `json:"content_type"`
+	Filename    string `json:"filename"`
+	Height      int    `json:"height"`
+	Width       int    `json:"width"`
+	Size        int64  `json:"size"`
+	URL         string `json:"url"`
 }
 
 // 发送消息

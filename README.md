@@ -42,6 +42,65 @@
 ### 组织方式
 框架使用`插件`的形式来增加功能
 
+### 插件管理面板
+
+启动服务后访问 `/admin` 查看插件目录，每个插件进入独立的 `/admin/plugins/{id}` 配置页面。页面支持跟随系统、浅色和深色三种主题，选择会保存在浏览器中。插件配置保存到 `config.json` 的 `plugin_settings` 字段并即时生效。生图插件可在此配置 OpenAI 兼容接口，用户通过 `/draw <图片描述>` 生成图片；发送指令时附带一张或多张图片会自动调用 `/images/edits`，将附件作为参考图，最多使用 16 张。
+
+未设置 `admin_password` 时，管理页面仅允许从服务器本机访问。需要远程管理时，在 `config.json` 中增加管理密码：
+
+```json
+{
+  "admin_password": "请设置高强度密码"
+}
+```
+
+远程访问时使用 HTTP Basic Auth，用户名固定为 `admin`，密码为 `admin_password`。生产环境应通过 HTTPS 反向代理访问管理页面。
+
+插件通过 `Plugin.Config` 声明配置项，不需要自行实现管理页面或 HTTP 接口。`password` 字段只向面板返回是否已配置，留空保存时会保留原值：
+
+```go
+plugin.Register(&plugin.Plugin{
+    Id:          "example",
+    Name:        "示例插件",
+    Description: "插件配置示例",
+    Config: []plugin.ConfigField{
+        {Key: "enabled", Label: "启用插件", Type: "boolean"},
+        {Key: "endpoint", Label: "接口地址", Type: "text"},
+        {Key: "api_key", Label: "API Key", Type: "password"},
+    },
+    ValidateConfig: validateConfig,
+    ApplyConfig:    applyConfig,
+})
+```
+
+`ValidateConfig` 在写入配置前执行，`ApplyConfig` 在启动加载和面板保存后执行。
+
+指令还可以声明生命周期钩子：
+
+```go
+&plugin.Command{
+    Prefix: "/example",
+    Handle: handle,
+    PermissionDenied: func(ctx *context.MessageContext) error {
+        return ctx.Text("你无权使用此指令").Send()
+    },
+    HandleError: func(ctx *context.MessageContext, commandErr error) error {
+        return ctx.Text("指令执行失败").Send()
+    },
+}
+```
+
+`PermissionDenied` 会在角色权限、私聊限制或黑白名单拒绝时调用。`HandleError` 会在 `Handle` 返回非空错误或发生 panic 后调用；原始错误及错误处理函数自身的错误仍会写入日志。子指令使用实际命中的子指令钩子。
+
+管理面板也会为所有插件自动提供访问控制，无需插件额外声明。可以设置插件默认规则，并为具体指令或子指令覆盖：
+
+- `关闭限制`：所有用户和群均可使用。
+- `白名单`：用户 OpenID 或群 OpenID 命中任一名单时允许使用。
+- `黑名单`：用户 OpenID 或群 OpenID 命中任一名单时拒绝使用。
+- 指令选择 `继承插件规则` 时使用插件默认规则。
+
+访问控制保存在 `config.json` 的 `plugin_access` 字段。群聊优先使用发送者的 `member_openid`，缺失时使用 `union_openid`；私聊使用 `user_openid`。被拒绝的指令会静默忽略。
+
 #### 新建插件
 在`plugins`(注意不是`lib/plugin`)目录下新建一个文件夹, 然后放入你的插件代码
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Plrx/lib/admin"
 	"Plrx/lib/config"
 	"Plrx/lib/constant"
 	"Plrx/lib/middleware"
@@ -11,8 +12,8 @@ import (
 	"Plrx/lib/storage"
 	"Plrx/lib/structers"
 	"Plrx/lib/templates"
-	plugins_push "Plrx/plugins/push"
 	_ "Plrx/plugins"
+	plugins_push "Plrx/plugins/push"
 	"bytes"
 	"crypto/ed25519"
 	"encoding/hex"
@@ -29,6 +30,23 @@ var requestsClient *requests.Client = requests.Init(5)
 func main() {
 	// 初始化相关配置
 	appConfig := config.InitConfig()
+	if err := plugin.LoadConfigurations(appConfig.PluginSettings); err != nil {
+		log.Fatalf("Failed to load plugin configuration: %v", err)
+	}
+	accessConfigs := make(map[string]plugin.AccessConfig, len(appConfig.PluginAccess))
+	for id, access := range appConfig.PluginAccess {
+		commands := make(map[string]plugin.AccessRule, len(access.Commands))
+		for path, rule := range access.Commands {
+			commands[path] = plugin.AccessRule{Mode: rule.Mode, Users: rule.Users, Groups: rule.Groups}
+		}
+		accessConfigs[id] = plugin.AccessConfig{
+			Default:  plugin.AccessRule{Mode: access.Default.Mode, Users: access.Default.Users, Groups: access.Default.Groups},
+			Commands: commands,
+		}
+	}
+	if err := plugin.LoadAccessConfigurations(accessConfigs); err != nil {
+		log.Fatalf("Failed to load plugin access configuration: %v", err)
+	}
 	if err := storage.Open(appConfig.Database); err != nil {
 		log.Fatalf("Failed to initialize SQLite storage: %v", err)
 	}
@@ -41,6 +59,7 @@ func main() {
 	plugins_push.SetClient(&client)
 	schedule.Start(&client)
 	r := gin.Default()
+	admin.Register(r, appConfig.AdminPassword)
 
 	// 主动推送接口 (不经过QQ签名校验)
 	r.POST("/push/:scope/:openid", plugins_push.HTTPHandle)
