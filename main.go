@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -74,7 +75,8 @@ func main() {
 		if err := c.ShouldBindJSON(&payload); err != nil {
 			return
 		}
-
+		rawJson, _ := json.MarshalIndent(payload, "", "  ")
+		fmt.Printf("[Raw]%v\n\n", string(rawJson))
 		// Op = 13, 签名验证
 		if payload.Op == 13 {
 			// log.Printf("[Webhook] 收到平台网络探测/验证请求")

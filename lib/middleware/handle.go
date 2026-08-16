@@ -166,6 +166,29 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		}
 		ctx.SetUserId(userID)
 		go callbackHandleFunc(callbackFunc, ctx)
+	case constant.GROUP_JOIN_REQUEST:
+		var answer string
+		switch payload.Data.VerifyInfo.Method {
+		case "verify_message":
+			answer = payload.Data.VerifyInfo.VerifyMsg
+		case "admin_review_qa":
+			if len(payload.Data.VerifyInfo.AnswerList) < 1 {
+				// 增加报错
+				return
+			}
+			answer = payload.Data.VerifyInfo.AnswerList[0].Answer
+		default:
+			return
+		}
+		ctx := &context.ApplyJoinGroupContext{
+			Answer: answer,
+		}
+		ctx.Init(payload.Data.JoinRequestId, payload.Data.GroupOpenID, payload.Data.Author.UserOpenID, client) // 初始化Context
+		err := plugin.CallGlobalJoinGroupHandle(ctx)                                                           // 增加recovery
+		if err != nil {
+			// 打印
+		}
+		return
 	}
 }
 

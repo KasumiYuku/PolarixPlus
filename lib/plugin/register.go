@@ -6,6 +6,7 @@ import (
 	"Plrx/lib/parser"
 	"Plrx/lib/utils"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -347,12 +348,7 @@ func contains(values []string, target string) bool {
 	if target == "" {
 		return false
 	}
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 func cloneAccessConfig(source AccessConfig) AccessConfig {

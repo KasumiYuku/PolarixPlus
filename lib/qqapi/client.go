@@ -165,3 +165,62 @@ func (c *Client) InteracteCallback(eventId string) error {
 	}
 	return c.Request.Put(fmt.Sprintf("%v/interactions/%v", c.ProxyAPI, eventId), nil, nil, header)
 }
+
+// 同意入群请求
+func (c *Client) AcceptGroupJoinRequest(requestId, groupId, userId string) error {
+	header, err := c.generateHeader()
+	if err != nil {
+		return err
+	}
+	type Data struct {
+		Op  string `json:"op"`
+		Rid string `json:"join_request_id"`
+	}
+	data := Data{
+		Op:  "approve",
+		Rid: requestId,
+	}
+	return c.Request.Post(fmt.Sprintf("%v/v2/groups/%v/approval_join_request/%v", c.ProxyAPI, groupId, userId), data, nil, header)
+}
+
+// 拒绝入群请求
+func (c *Client) RejectGroupJoinRequest(requestId, groupId, userId, reason string) error {
+	header, err := c.generateHeader()
+	if err != nil {
+		return err
+	}
+	type Data struct {
+		Op     string `json:"op"`
+		Rid    string `json:"join_request_id"`
+		Reason string `json:"reject_reason"`
+		A      bool   `json:"add_to_member_blacklist"`
+	}
+	data := Data{
+		Op:     "decline",
+		Rid:    requestId,
+		Reason: reason,
+		A:      false,
+	}
+	return c.Request.Post(fmt.Sprintf("%v/v2/groups/%v/approval_join_request/%v", c.ProxyAPI, groupId, userId), data, nil, header)
+}
+
+// 拒绝入群请求并拉黑
+func (c *Client) RejectGroupJoinRequestAndAddToBlacklist(requestId, groupId, userId, reason string) error {
+	header, err := c.generateHeader()
+	if err != nil {
+		return err
+	}
+	type Data struct {
+		Op     string `json:"op"`
+		Rid    string `json:"join_request_id"`
+		Reason string `json:"reject_reason"`
+		A      bool   `json:"add_to_member_blacklist"`
+	}
+	data := Data{
+		Op:     "decline",
+		Rid:    requestId,
+		Reason: reason,
+		A:      true,
+	}
+	return c.Request.Post(fmt.Sprintf("%v/v2/groups/%v/approval_join_request/%v", c.ProxyAPI, groupId, userId), data, nil, header)
+}

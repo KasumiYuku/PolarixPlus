@@ -20,11 +20,12 @@ type CallbackData struct {
 }
 
 type PrasedData struct {
-	Id          string               `json:"id"`
-	Content     string               `json:"content"`
-	GroupOpenID string               `json:"group_openid"`
-	Attachments []message.Attachment `json:"attachments"`
-	Author      struct {
+	Id           string               `json:"id"`
+	Content      string               `json:"content"`
+	GroupOpenID  string               `json:"group_openid"`
+	MemberOpenId string               `json:"member_openid"` // 入群验证时传递的member_id
+	Attachments  []message.Attachment `json:"attachments"`
+	Author       struct {
 		ID           string                `json:"id"`
 		UserOpenID   string                `json:"user_openid"`
 		MemberOpenID string                `json:"member_openid"`
@@ -41,4 +42,17 @@ type PrasedData struct {
 	Callback struct {
 		Resolved CallbackData `json:"resolved"`
 	} `json:"data"`
+	JoinRequestId string         `json:"join_request_id"`
+	VerifyInfo    VerifyInfoData `json:"verify_info"`
+}
+
+type VerifyInfoData struct {
+	Method     string         `json:"method"`
+	VerifyMsg  string         `json:"verify_message"`
+	AnswerList []QuestionData `json:"review_qa_list"`
+}
+
+type QuestionData struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
 }
