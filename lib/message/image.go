@@ -53,7 +53,7 @@ func (msg *ImageMessage) Fragment(host *assets.ImageHost) (string, error) {
 		if dims == "" {
 			dims = probeDims(s)
 		}
-		return fmt.Sprintf("![%s%s](%s)", summary, dims, s), nil
+		return fmt.Sprintf("![%s%s](%s)\n", summary, dims, s), nil
 	}
 
 	// 本地文件/base64/[]byte：必须走图床，上传后探测尺寸

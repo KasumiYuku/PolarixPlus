@@ -138,13 +138,10 @@ export default function SettingsPage() {
   return (
     <Show when={fields()} fallback={<SkeletonRows rows={8} />}>
       <div class="px-rise">
-        <div class="mb-5">
-          <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">设置</h2>
-          <p class="mt-1 text-[13px] text-muted-foreground-2">核心运行参数；即时生效项保存即应用，其余需重启</p>
-        </div>
+        <h2 class="mb-6 font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">设置</h2>
 
         <Show when={restartNotice()}>
-          <div class="flex items-center gap-2.5 rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-[13px] text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
+          <div class="mb-5 flex items-center gap-2.5 rounded-full border border-amber-300/50 bg-amber-50 px-5 py-3 text-[13px] text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
             <Icon name="refresh" size={16} class="shrink-0" />
             <span>已保存：{restartNotice()!.length} 项参数需重启后生效</span>
             <Button variant="primary" onClick={() => openConfirm('restart')} class="ml-auto">立即重启</Button>
@@ -181,7 +178,7 @@ export default function SettingsPage() {
             <For each={fields()!.filter((f) => f.kind === 'note')}>
               {(f) => (
                 <Field label={f.label} desc={f.desc}>
-                  <pre class="max-h-[260px] w-full overflow-auto whitespace-pre-wrap break-all rounded-lg border border-dashed border-line-4 bg-background p-3 font-mono text-xs leading-relaxed text-muted-foreground">
+                  <pre class="max-h-[260px] w-full overflow-auto whitespace-pre-wrap break-all rounded-[1.4rem] border border-dashed border-line-4 bg-field p-4 font-mono text-xs leading-relaxed text-muted-foreground">
                     {JSON.stringify(f.value, null, 2)}
                   </pre>
                 </Field>
@@ -191,7 +188,7 @@ export default function SettingsPage() {
         </Card>
 
         <Card title="危险操作">
-          <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-3.5 last:border-b-0">
+          <div class="flex items-center justify-between gap-4 border-b border-card-divider px-6 py-4 last:border-b-0">
             <div>
               <b class="text-[13.5px] font-semibold text-foreground">重启服务</b>
               <p class="mt-0.5 max-w-[620px] text-xs text-muted-foreground-2">优雅关闭后自动重新拉起进程（PID 会变化）。由 systemd 等守护管理时请设置 POLARIX_SUPERVISED=1</p>
@@ -200,7 +197,7 @@ export default function SettingsPage() {
               <Icon name="refresh" size={15} /> 重启
             </Button>
           </div>
-          <div class="flex items-center justify-between gap-4 px-6 py-3.5">
+          <div class="flex items-center justify-between gap-4 border-t border-card-divider px-6 py-4">
             <div>
               <b class="text-[13.5px] font-semibold text-foreground">停止服务</b>
               <p class="mt-0.5 text-xs text-muted-foreground-2">退出进程，需要你手动再次启动</p>
@@ -268,7 +265,7 @@ function FieldControl(props: { field: CoreField; value: unknown; onChange: (v: u
     const lines = Array.isArray(props.value) ? props.value.join('\n') : ''
     return (
       <textarea
-        class="w-full rounded-lg border border-line-3 bg-background px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+        class="w-full rounded-[1.4rem] border border-line-3 bg-field px-4 py-3 font-mono text-xs leading-relaxed text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
         rows={4}
         value={lines}
         placeholder={f.kind === 'intlist' ? '每行一个数值' : '每行一个事件名'}
@@ -279,7 +276,7 @@ function FieldControl(props: { field: CoreField; value: unknown; onChange: (v: u
   if (f.kind === 'secret') {
     return (
       <input
-        class="h-9 w-full max-w-[480px] rounded-lg border border-line-3 bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+        class="h-10 w-full max-w-[480px] rounded-full border border-line-3 bg-field px-5 text-[13px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
         type="password"
         autocomplete="new-password"
         placeholder={f.set ? '已配置，留空则保留' : '未配置'}
@@ -289,7 +286,7 @@ function FieldControl(props: { field: CoreField; value: unknown; onChange: (v: u
   }
   return (
     <input
-      class="h-9 w-full max-w-[480px] rounded-lg border border-line-3 bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+      class="h-10 w-full max-w-[480px] rounded-full border border-line-3 bg-field px-5 text-[13px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
       type={f.kind === 'number' ? 'number' : 'text'}
       value={props.value == null ? '' : String(props.value)}
       onInput={(e) => props.onChange(e.currentTarget.value)}

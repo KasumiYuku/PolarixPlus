@@ -31,8 +31,6 @@ var coreSpecs = []coreField{
 	{Key: "appid", Label: "机器人 AppID", Kind: "text", Restart: true},
 	{Key: "secret", Label: "AppSecret", Desc: "不会回显, 留空保持原值", Kind: "secret", Restart: true},
 	{Key: "proxy", Label: "API 代理地址", Kind: "text", Restart: true},
-	{Key: "uin", Label: "机器人 UIN", Kind: "number", Restart: true},
-	{Key: "uid", Label: "机器人 UID", Kind: "text", Restart: true},
 	{Key: "database", Label: "SQLite 数据库文件", Kind: "text", Restart: true},
 	{Key: "protocol", Label: "协议模式", Kind: "select", Options: []string{"webhook", "websocket"}, Restart: true},
 	{Key: "intents", Label: "WebSocket 订阅事件", Desc: "至少选一个；全不选时启动使用默认订阅", Kind: "multiselect", Options: gateway.IntentEvents(), Restart: true},
@@ -66,10 +64,6 @@ func applyCoreValue(field *coreField, cfg config.AppConfig) {
 		field.Value, field.Set = "", cfg.AppSecret != ""
 	case "proxy":
 		field.Value = cfg.ProxyAPI
-	case "uin":
-		field.Value = cfg.Uin
-	case "uid":
-		field.Value = cfg.Uid
 	case "database":
 		field.Value = cfg.Database
 	case "admin_password":

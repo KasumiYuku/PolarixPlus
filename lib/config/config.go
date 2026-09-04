@@ -24,8 +24,6 @@ type AppConfig struct {
 	AppSecret           string                    `json:"secret"`
 	Plugins             []Plugin                  `json:"plugins"`
 	ProxyAPI            string                    `json:"proxy"`
-	Uin                 uint64                    `json:"uin"`
-	Uid                 string                    `json:"uid"`
 	Database            string                    `json:"database"`
 	AdminPassword       string                    `json:"admin_password"`
 	Protocol            string                    `json:"protocol,omitempty"` // webhook | websocket
@@ -228,18 +226,6 @@ func applyCoreKey(cfg *AppConfig, key string, rawValue json.RawMessage) error {
 			return fmt.Errorf("proxy: %w", err)
 		}
 		cfg.ProxyAPI = v
-	case "uin":
-		var v uint64
-		if err := json.Unmarshal(rawValue, &v); err != nil {
-			return fmt.Errorf("uin: %w", err)
-		}
-		cfg.Uin = v
-	case "uid":
-		var v string
-		if err := json.Unmarshal(rawValue, &v); err != nil {
-			return fmt.Errorf("uid: %w", err)
-		}
-		cfg.Uid = v
 	case "database":
 		var v string
 		if err := json.Unmarshal(rawValue, &v); err != nil {

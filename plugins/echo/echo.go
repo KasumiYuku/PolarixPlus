@@ -86,7 +86,7 @@ func randomImg(context *context.MessageContext) error {
 	btn.SetAutoCommand("/random", true, false).SetUnsupportedTip("不支持按钮捏").SetPermission(buttons.AllUser)
 	return context.Msg().
 		Image(re.Url, "img", int(re.Width), int(re.Height)).
-		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n> 图片直链:\n```\n%v\n```", re.Url)).
+		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n\n> 图片直链:\n```\n%v\n```", re.Url)).
 		Keyboard(k).
 		Send()
 }
@@ -124,7 +124,7 @@ func showcase(ctx *context.MessageContext) error {
 		At(ctx.UserId).
 		Text(" 看这个").
 		Image(re.Url, "随机图").
-		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n```\n%v\n```", re.Url)).
+		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n\n```\n%v\n```", re.Url)).
 		Keyboard(k).
 		Send()
 }

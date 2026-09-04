@@ -78,13 +78,10 @@ go build -o polarix .
 | 2 | `GROUP_MESSAGE_CREATE` | 群内全部消息 |
 | 3 | `C2C_MESSAGE_CREATE` | 私聊消息 |
 | 4 | `INTERACTION_CREATE` | 互动事件（按钮回调等） |
-| 5 | `GROUP_JOIN_REQUEST` | 入群申请 |
-| 6 | `GROUP_MEMBER_ADD` | 新成员入群 |
-| 7 | `GROUP_MEMBER_REMOVE` | 成员退群 |
-| 8 | `MESSAGE_AUDIT_PASS` | 消息审核通过 |
-| 9 | `MESSAGE_AUDIT_REJECT` | 消息审核驳回 |
-| 10 | `GROUP_ADD_ROBOT` | 机器人被拉入群 |
-| 11 | `GROUP_DEL_ROBOT` | 机器人被移出群 |
+| 5 | `GROUP_MEMBER_ADD` | 新成员入群 |
+| 6 | `GROUP_MEMBER_REMOVE` | 成员退群 |
+| 7 | `MESSAGE_AUDIT_PASS` | 消息审核通过 |
+| 8 | `MESSAGE_AUDIT_REJECT` | 消息审核驳回 |
 
 </details>
 

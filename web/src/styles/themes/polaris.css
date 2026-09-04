@@ -1,70 +1,84 @@
 /* ------------------------------ */
 /* ---------- Polaris ----------- */
 /* ------------------------------ */
+/* 深林有机主题: 大地色系自然有机风格卡落地
+   浅色: #faf6f1 暖米底 / 墨绿主 / sage+陶土点缀
+   深色: 暖炭土底 / 低饱和墨绿主 / 米白文字, 旗舰形态 */
 
 @theme theme-polaris inline {
-  /* Brand palette: Tailwind emerald v4 精确 oklch, 低饱和墨绿 */
-  --color-polaris-50: oklch(97.5% 0.024 166);
-  --color-polaris-100: oklch(93.7% 0.05 166);
-  --color-polaris-200: oklch(87.3% 0.085 166);
-  --color-polaris-300: oklch(76.4% 0.127 165);
-  --color-polaris-400: oklch(64.1% 0.15 161);
-  --color-polaris-500: oklch(57.8% 0.151 159);
-  --color-polaris-600: oklch(51.6% 0.152 169.4);
-  --color-polaris-700: oklch(44.2% 0.13 166);
-  --color-polaris-800: oklch(37.1% 0.105 163);
-  --color-polaris-900: oklch(30.3% 0.078 163);
-  --color-polaris-950: oklch(25.7% 0.062 163);
+  /* 墨绿 ramp (hue ~160): 低饱和森林绿, 深色主用 400-500 亮阶, 按钮底 600 */
+  --color-polaris-50: oklch(97.5% 0.02 165);
+  --color-polaris-100: oklch(94.5% 0.042 165);
+  --color-polaris-200: oklch(88.5% 0.072 164);
+  --color-polaris-300: oklch(79% 0.106 162);
+  --color-polaris-400: oklch(66.5% 0.132 160);
+  --color-polaris-500: oklch(58% 0.132 158);
+  --color-polaris-600: oklch(47% 0.118 159);
+  --color-polaris-700: oklch(40% 0.1 161);
+  --color-polaris-800: oklch(32.5% 0.082 162);
+  --color-polaris-900: oklch(28.5% 0.062 163);
+  --color-polaris-950: oklch(23% 0.05 164);
 
-  /* Gray palette: Tailwind stone v4 精确 oklch, 暖中性带微灰调 */
-  --color-polaris-gray-50: oklch(98.5% 0.002 105);
-  --color-polaris-gray-100: oklch(97% 0.003 106);
-  --color-polaris-gray-200: oklch(92.9% 0.005 100);
-  --color-polaris-gray-300: oklch(86.9% 0.007 90);
-  --color-polaris-gray-400: oklch(70.9% 0.01 75);
-  --color-polaris-gray-500: oklch(55.3% 0.014 72);
-  --color-polaris-gray-600: oklch(44.3% 0.015 66);
-  --color-polaris-gray-700: oklch(37.2% 0.013 66);
-  --color-polaris-gray-800: oklch(27.9% 0.01 60);
-  --color-polaris-gray-900: oklch(20.9% 0.01 60);
-  --color-polaris-gray-950: oklch(12.9% 0.01 60);
+  /* 暖中性 ramp: 米白→暖炭土, hue 偏黄防冷 */
+  --color-polaris-gray-50: oklch(98.6% 0.005 88);
+  --color-polaris-gray-100: oklch(97% 0.008 88);
+  --color-polaris-gray-200: oklch(93.2% 0.012 85);
+  --color-polaris-gray-300: oklch(86.5% 0.016 82);
+  --color-polaris-gray-400: oklch(72% 0.018 76);
+  --color-polaris-gray-500: oklch(57% 0.016 72);
+  --color-polaris-gray-600: oklch(45% 0.014 70);
+  --color-polaris-gray-700: oklch(37% 0.012 68);
+  --color-polaris-gray-800: oklch(28% 0.011 68);
+  --color-polaris-gray-900: oklch(21% 0.01 68);
+  --color-polaris-gray-950: oklch(15% 0.008 68);
+
+  /* 点缀色: 鼠尾草灰绿 + 陶土暖棕 */
+  --color-polaris-sage-300: oklch(82% 0.055 128);
+  --color-polaris-sage-400: oklch(75% 0.065 127);
+  --color-polaris-sage-500: oklch(68% 0.07 126);
+  --color-polaris-sage-600: oklch(59% 0.062 126);
+  --color-polaris-tan-300: oklch(84% 0.06 64);
+  --color-polaris-tan-400: oklch(78% 0.072 62);
+  --color-polaris-tan-500: oklch(72% 0.075 60);
+  --color-polaris-tan-600: oklch(64% 0.068 55);
+  --color-polaris-tan-700: oklch(55% 0.058 52);
 }
 
 :root[data-theme="theme-polaris"],
 [data-theme="theme-polaris"] {
 
   /* ============================================ */
-  /* GLOBAL SURFACES + TEXT                       */
+  /* 浅色主题: 暖米底 #faf6f1 (风格卡强制)         */
   /* ============================================ */
-  
-  --background: var(--color-white);
-  --background-1: var(--color-polaris-gray-50);
-  --background-2: var(--color-polaris-gray-100);
-  --background-plain: var(--color-white);
-  --foreground: var(--color-polaris-gray-800);
-  --foreground-inverse: var(--color-white);
-  
-  --inverse: var(--color-primary-950);
-  
+
+  --background: oklch(98.6% 0.005 88);
+  --background-1: oklch(96.4% 0.009 86);
+  --background-2: oklch(97.6% 0.007 85); /* 近似 #faf6f1 暖米 */
+  --background-plain: oklch(99.2% 0.003 88);
+  --foreground: oklch(33% 0.014 70);
+  --foreground-inverse: oklch(98.6% 0.005 88);
+
+  --inverse: oklch(21% 0.012 68);
+
+  --field: oklch(96.4% 0.009 86);
+  --field-focus: oklch(99.2% 0.003 88);
+
+  /* 边框: 米褐层次 */
+  --border: oklch(90.5% 0.013 84);
+  --border-line-inverse: oklch(21% 0.012 68);
+  --border-line-1: oklch(95.5% 0.009 86);
+  --border-line-2: oklch(90.5% 0.013 84);
+  --border-line-3: oklch(83% 0.016 80);
+  --border-line-4: oklch(72.5% 0.018 76);
+  --border-line-5: oklch(60% 0.018 72);
+  --border-line-6: oklch(47% 0.015 70);
+  --border-line-7: oklch(36% 0.013 68);
+  --border-line-8: oklch(24% 0.011 68);
+
   /* ============================================ */
-  /* BORDERS (Full Scale)                         */
+  /* PRIMARY RAMP (墨绿)                          */
   /* ============================================ */
-  
-  --border: var(--color-polaris-gray-200);
-  --border-line-inverse: var(--color-white);
-  --border-line-1: var(--color-polaris-gray-100);
-  --border-line-2: var(--color-polaris-gray-200);
-  --border-line-3: var(--color-polaris-gray-300);
-  --border-line-4: var(--color-polaris-gray-400);
-  --border-line-5: var(--color-polaris-gray-500);
-  --border-line-6: var(--color-polaris-gray-600);
-  --border-line-7: var(--color-polaris-gray-700);
-  --border-line-8: var(--color-polaris-gray-800);
-  
-  /* ============================================ */
-  /* PRIMARY RAMP (Full 11-shade scale)           */
-  /* ============================================ */
-  
+
   --primary-50: var(--color-polaris-50);
   --primary-100: var(--color-polaris-100);
   --primary-200: var(--color-polaris-200);
@@ -76,81 +90,73 @@
   --primary-800: var(--color-polaris-800);
   --primary-900: var(--color-polaris-900);
   --primary-950: var(--color-polaris-950);
-  
-  /* PRIMARY STATES */
-  --primary: var(--color-primary-600);
+
+  --primary: var(--color-polaris-600);
   --primary-line: transparent;
-  --primary-foreground: var(--color-white);
-  --primary-hover: var(--color-primary-700);
-  --primary-focus: var(--color-primary-700);
-  --primary-active: var(--color-primary-700);
-  --primary-checked: var(--color-primary-600);
-  
+  --primary-foreground: oklch(98.6% 0.005 88);
+  --primary-hover: var(--color-polaris-700);
+  --primary-focus: var(--color-polaris-500);
+  --primary-active: var(--color-polaris-800);
+  --primary-checked: var(--color-polaris-600);
+
   /* ============================================ */
-  /* SECONDARY                                    */
+  /* SECONDARY (米色按钮, 土感)                   */
   /* ============================================ */
-  
-  --secondary: var(--color-polaris-gray-900);
-  --secondary-line: transparent;
-  --secondary-foreground: var(--color-white);
-  --secondary-hover: var(--color-polaris-gray-800);
-  --secondary-focus: var(--color-polaris-gray-800);
-  --secondary-active: var(--color-polaris-gray-800);
-  
+
+  --secondary: oklch(93.5% 0.013 84);
+  --secondary-line: oklch(87% 0.016 81);
+  --secondary-foreground: oklch(33% 0.014 70);
+  --secondary-hover: oklch(90% 0.014 83);
+  --secondary-focus: oklch(90% 0.014 83);
+  --secondary-active: oklch(86.5% 0.015 81);
+
   /* ============================================ */
-  /* LAYER                                        */
+  /* LAYER / SURFACE / MUTED                      */
   /* ============================================ */
-  
-  --layer: var(--background-plain);
+
+  --layer: oklch(99.2% 0.003 88);
   --layer-line: var(--border);
   --layer-foreground: var(--foreground);
   --layer-hover: var(--background-1);
   --layer-focus: var(--background-1);
   --layer-active: var(--background-1);
-  
-  /* ============================================ */
-  /* SURFACE                                      */
-  /* ============================================ */
-  
-  --surface: var(--color-polaris-gray-100);
-  --surface-1: var(--color-polaris-gray-200);
-  --surface-2: var(--color-polaris-gray-300);
-  --surface-3: var(--color-polaris-gray-400);
-  --surface-4: var(--color-polaris-gray-500);
-  --surface-5: var(--color-polaris-gray-600);
+
+  --surface: oklch(93.5% 0.013 84);
+  --surface-1: oklch(89% 0.015 82);
+  --surface-2: oklch(83% 0.017 80);
+  --surface-3: oklch(75% 0.019 76);
+  --surface-4: oklch(62% 0.018 72);
+  --surface-5: oklch(48% 0.015 70);
   --surface-line: transparent;
-  --surface-foreground: var(--color-polaris-gray-800);
-  --surface-hover: var(--color-polaris-gray-200);
-  --surface-focus: var(--color-polaris-gray-200);
-  --surface-active: var(--color-polaris-gray-200);
-  
+  --surface-foreground: var(--foreground);
+  --surface-hover: oklch(89.5% 0.014 83);
+  --surface-focus: oklch(89.5% 0.014 83);
+  --surface-active: oklch(86.5% 0.015 81);
+
+  --muted: oklch(96.4% 0.009 86);
+  --muted-foreground: oklch(47% 0.014 70);
+  --muted-foreground-1: oklch(52% 0.015 71);
+  --muted-foreground-2: oklch(57% 0.015 72);
+  --muted-hover: oklch(94.5% 0.01 85);
+  --muted-focus: oklch(94.5% 0.01 85);
+  --muted-active: oklch(91% 0.012 83);
+
   /* ============================================ */
-  /* MUTED                                        */
+  /* DESTRUCTIVE (暖陶红, 非冷红)                 */
   /* ============================================ */
-  
-  --muted: var(--color-polaris-gray-50);
-  --muted-foreground: var(--color-polaris-gray-500);
-  --muted-foreground-1: var(--color-polaris-gray-600);
-  --muted-foreground-2: var(--color-polaris-gray-700);
-  --muted-hover: var(--color-polaris-gray-100);
-  --muted-focus: var(--color-polaris-gray-100);
-  --muted-active: var(--color-polaris-gray-100);
-  
+
+  --destructive: oklch(56% 0.17 35);
+  --destructive-foreground: oklch(98.6% 0.005 88);
+  --destructive-hover: oklch(50% 0.16 34);
+  --destructive-focus: oklch(50% 0.16 34);
+  --destructive-active: oklch(44% 0.15 33);
+
   /* ============================================ */
-  /* DESTRUCTIVE                                  */
+  /* NAVBAR / SIDEBAR (米底)                      */
   /* ============================================ */
-  
-  --destructive: var(--color-red-500);
-  --destructive-foreground: var(--color-white);
-  --destructive-hover: var(--color-red-600);
-  --destructive-focus: var(--color-red-600);
-  
-  /* ============================================ */
-  /* NAVBAR                                       */
-  /* ============================================ */
-  
-  --navbar: var(--background-plain);
-  --navbar-line: var(--border);
+
+  --navbar: oklch(99.2% 0.003 88);
+  --navbar-line: transparent;
   --navbar-divider: var(--border);
   --navbar-nav-foreground: var(--foreground);
   --navbar-nav-hover: var(--muted-hover);
@@ -158,524 +164,247 @@
   --navbar-nav-active: var(--muted-hover);
   --navbar-nav-list-divider: var(--border);
   --navbar-inverse: var(--inverse);
-  
-  --navbar-1: var(--background-1);
-  --navbar-1-line: var(--border);
-  --navbar-1-divider: var(--border);
-  --navbar-1-nav-foreground: var(--foreground);
-  --navbar-1-nav-hover: var(--surface-1);
-  --navbar-1-nav-focus: var(--surface-1);
-  --navbar-1-nav-active: var(--surface-1);
-  --navbar-1-nav-list-divider: var(--border);
-  
-  --navbar-2: var(--background-2);
-  --navbar-2-line: transparent;
-  --navbar-2-divider: var(--border-line-3);
-  --navbar-2-nav-foreground: var(--foreground);
-  --navbar-2-nav-hover: var(--surface-1);
-  --navbar-2-nav-focus: var(--surface-1);
-  --navbar-2-nav-active: var(--surface-1);
-  --navbar-2-nav-list-divider: var(--border);
-  
-  /* ============================================ */
-  /* SIDEBAR                                      */
-  /* ============================================ */
-  
-  --sidebar: var(--background-plain);
-  --sidebar-line: var(--border);
-  --sidebar-divider: var(--border);
+
+  --sidebar: oklch(98% 0.006 86);
+  --sidebar-line: transparent;
+  --sidebar-divider: oklch(91.5% 0.012 84);
   --sidebar-nav-foreground: var(--foreground);
-  --sidebar-nav-hover: var(--muted-hover);
-  --sidebar-nav-focus: var(--muted-hover);
-  --sidebar-nav-active: var(--muted-hover);
+  --sidebar-nav-hover: oklch(93.5% 0.012 84);
+  --sidebar-nav-focus: oklch(93.5% 0.012 84);
+  --sidebar-nav-active: oklch(93.5% 0.012 84);
   --sidebar-nav-list-divider: var(--border);
   --sidebar-inverse: var(--inverse);
-  
-  --sidebar-1: var(--background-1);
-  --sidebar-1-line: var(--border);
-  --sidebar-1-divider: var(--border);
-  --sidebar-1-nav-foreground: var(--foreground);
-  --sidebar-1-nav-hover: var(--surface-1);
-  --sidebar-1-nav-focus: var(--surface-1);
-  --sidebar-1-nav-active: var(--surface-1);
-  --sidebar-1-nav-list-divider: var(--border);
-  
-  --sidebar-2: var(--background-2);
-  --sidebar-2-line: transparent;
-  --sidebar-2-divider: var(--border);
-  --sidebar-2-nav-foreground: var(--foreground);
-  --sidebar-2-nav-hover: var(--surface-1);
-  --sidebar-2-nav-focus: var(--surface-1);
-  --sidebar-2-nav-active: var(--surface-1);
-  --sidebar-2-nav-list-divider: var(--border);
-  
+
   /* ============================================ */
-  /* CARD                                         */
+  /* CARD / DROPDOWN / OVERLAY / POPOVER          */
   /* ============================================ */
-  
-  --card: var(--background-plain);
-  --card-line: var(--border);
-  --card-divider: var(--border);
-  --card-header: var(--background-2);
-  --card-footer: var(--background-2);
+
+  --card: oklch(99.4% 0.003 88);
+  --card-line: transparent;
+  --card-divider: oklch(92% 0.012 84);
+  --card-header: oklch(99.4% 0.003 88);
+  --card-footer: oklch(97% 0.008 86);
   --card-inverse: var(--inverse);
-  
-  /* ============================================ */
-  /* DROPDOWN                                     */
-  /* ============================================ */
-  
-  --dropdown: var(--background-plain);
-  --dropdown-1: var(--background-plain);
-  --dropdown-line: transparent;
+
+  --dropdown: oklch(99.4% 0.003 88);
+  --dropdown-line: oklch(88% 0.015 82);
   --dropdown-divider: var(--border);
-  --dropdown-header: var(--background-2);
-  --dropdown-footer: var(--background-2);
+  --dropdown-header: oklch(96.5% 0.009 86);
+  --dropdown-footer: oklch(96.5% 0.009 86);
   --dropdown-item-foreground: var(--foreground);
   --dropdown-item-hover: var(--muted-hover);
   --dropdown-item-focus: var(--muted-hover);
   --dropdown-item-active: var(--muted-hover);
   --dropdown-inverse: var(--inverse);
-  
-  /* ============================================ */
-  /* SELECT                                       */
-  /* ============================================ */
-  
-  --select: var(--background-plain);
-  --select-1: var(--background-plain);
-  --select-line: transparent;
-  --select-item-foreground: var(--foreground);
-  --select-item-hover: var(--muted-hover);
-  --select-item-focus: var(--muted-hover);
-  --select-item-active: var(--muted-hover);
-  --select-inverse: var(--inverse);
-  
-  /* ============================================ */
-  /* OVERLAY                                      */
-  /* ============================================ */
-  
-  --overlay: var(--background-plain);
-  --overlay-line: transparent;
+
+  --overlay: oklch(99.4% 0.003 88);
+  --overlay-line: var(--border);
   --overlay-divider: var(--border);
-  --overlay-header: var(--background-2);
-  --overlay-footer: var(--background-2);
+  --overlay-header: oklch(96.5% 0.009 86);
+  --overlay-footer: oklch(96.5% 0.009 86);
   --overlay-inverse: var(--inverse);
-  
+
+  --popover: oklch(99.4% 0.003 88);
+  --popover-line: oklch(88% 0.015 82);
+
   /* ============================================ */
-  /* POPOVER                                      */
+  /* TOOLTIP / TABLE / SWITCH / FOOTER            */
   /* ============================================ */
-  
-  --popover: var(--background-plain);
-  --popover-line: var(--border-line-1);
-  
-  /* ============================================ */
-  /* TOOLTIP                                      */
-  /* ============================================ */
-  
-  --tooltip: var(--inverse);
-  --tooltip-foreground: var(--foreground-inverse);
+
+  --tooltip: oklch(21% 0.012 68);
+  --tooltip-foreground: oklch(98.6% 0.005 88);
   --tooltip-line: transparent;
-  
-  /* ============================================ */
-  /* TABLE                                        */
-  /* ============================================ */
-  
+
   --table-line: var(--border);
-  
-  /* ============================================ */
-  /* SWITCH                                       */
-  /* ============================================ */
-  
-  --switch: var(--background-plain);
-  
-  /* ============================================ */
-  /* FOOTER                                       */
-  /* ============================================ */
-  
-  --footer: var(--background-plain);
+
+  --switch: oklch(99.4% 0.003 88);
+
+  --footer: oklch(97% 0.008 86);
   --footer-line: var(--border);
   --footer-inverse: var(--inverse);
-  
+
   /* ============================================ */
   /* SCROLLBAR                                    */
   /* ============================================ */
-  
-  --scrollbar-track: var(--background-1);
-  --scrollbar-thumb: var(--surface-2);
-  --scrollbar-track-inverse: transparent;
-  --scrollbar-thumb-inverse: var(--foreground-inverse);
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: oklch(84% 0.016 80);
+  --scrollbar-thumb-hover: oklch(72% 0.018 76);
+
   /* ============================================ */
-  /* CHARTS (Apexcharts)                          */
+  /* 纸感噪点纹理 (浅色: 深灰噪点低透明)          */
   /* ============================================ */
-  
-  --chart-colors-background: var(--background-plain);
-  --chart-colors-background-inverse: var(--inverse);
-  --chart-colors-chart-inverse: var(--background-1);
-  --chart-colors-foreground: var(--foreground);
-  --chart-colors-foreground-inverse: var(--foreground-inverse);
-  
-  --chart-primary: var(--color-primary-600);
-  --chart-colors-primary: var(--color-primary-600);
-  --chart-colors-primary-inverse: var(--color-primary-300);
-  --chart-colors-primary-hex: var(--color-primary-600);
-  --chart-colors-primary-hex-inverse: var(--color-primary-300);
-  --chart-1: var(--color-primary-50);
-  --chart-colors-chart-1: var(--color-primary-50);
-  --chart-colors-chart-1-inverse: var(--color-primary-100);
-  --chart-colors-chart-1-hex: var(--color-primary-50);
-  --chart-colors-chart-1-hex-inverse: var(--color-primary-100);
-  --chart-2: var(--color-primary-200);
-  --chart-colors-chart-2: var(--color-primary-200);
-  --chart-colors-chart-2-inverse: var(--color-primary-300);
-  --chart-colors-chart-2-hex: var(--color-primary-200);
-  --chart-colors-chart-2-hex-inverse: var(--color-primary-300);
-  --chart-3: var(--color-primary-400);
-  --chart-colors-chart-3: var(--color-primary-400);
-  --chart-colors-chart-3-inverse: var(--color-primary-500);
-  --chart-colors-chart-3-hex: var(--color-primary-400);
-  --chart-colors-chart-3-hex-inverse: var(--color-primary-500);
-  --chart-4: var(--color-primary-700);
-  --chart-colors-chart-4: var(--color-primary-700);
-  --chart-colors-chart-4-inverse: var(--color-primary-500);
-  --chart-colors-chart-4-hex: var(--color-primary-700);
-  --chart-colors-chart-4-hex-inverse: var(--color-primary-500);
-  --chart-5: var(--color-primary-900);
-  --chart-colors-chart-5: var(--color-primary-900);
-  --chart-colors-chart-5-inverse: var(--color-primary-700);
-  --chart-colors-chart-5-hex: var(--color-primary-900);
-  --chart-colors-chart-5-hex-inverse: var(--color-primary-700);
-  --chart-6: var(--color-sky-600);
-  --chart-colors-chart-6: var(--color-sky-600);
-  --chart-colors-chart-6-inverse: var(--color-sky-400);
-  --chart-colors-chart-6-hex: var(--color-sky-600);
-  --chart-colors-chart-6-hex-inverse: var(--color-sky-400);
-  --chart-7: var(--color-emerald-600);
-  --chart-colors-chart-7: var(--color-emerald-600);
-  --chart-colors-chart-7-inverse: var(--color-emerald-400);
-  --chart-colors-chart-7-hex: var(--color-emerald-600);
-  --chart-colors-chart-7-hex-inverse: var(--color-emerald-400);
-  --chart-8: var(--color-violet-600);
-  --chart-colors-chart-8: var(--color-violet-600);
-  --chart-colors-chart-8-inverse: var(--color-violet-400);
-  --chart-colors-chart-8-hex: var(--color-violet-600);
-  --chart-colors-chart-8-hex-inverse: var(--color-violet-400);
-  --chart-9: var(--color-rose-500);
-  --chart-colors-chart-9: var(--color-rose-500);
-  --chart-colors-chart-9-inverse: var(--color-rose-300);
-  --chart-colors-chart-9-hex: var(--color-rose-500);
-  --chart-colors-chart-9-hex-inverse: var(--color-rose-300);
-  --chart-10: var(--color-polaris-gray-300);
-  --chart-colors-chart-10: var(--color-polaris-gray-300);
-  --chart-colors-chart-10-inverse: var(--color-polaris-gray-500);
-  --chart-colors-chart-10-hex: var(--color-polaris-gray-300);
-  --chart-colors-chart-10-hex-inverse: var(--color-polaris-gray-500);
-  
-  --chart-colors-candlestick-upward: var(--color-green-500);
-  --chart-colors-candlestick-upward-inverse: var(--color-green-400);
-  --chart-colors-candlestick-downward: var(--color-red-500);
-  --chart-colors-candlestick-downward-inverse: var(--color-red-400);
-  
-  --chart-colors-labels: var(--color-polaris-gray-600);
-  --chart-colors-labels-inverse: var(--color-polaris-gray-400);
-  --chart-colors-xaxis-labels: var(--color-polaris-gray-500);
-  --chart-colors-xaxis-labels-inverse: var(--color-polaris-gray-400);
-  --chart-colors-yaxis-labels: var(--color-polaris-gray-500);
-  --chart-colors-yaxis-labels-inverse: var(--color-polaris-gray-400);
-  
-  --chart-colors-grid-border: var(--border);
-  --chart-colors-grid-border-inverse: var(--color-polaris-gray-700);
-  --chart-colors-bar-ranges: var(--surface-1);
-  --chart-colors-bar-ranges-inverse: var(--color-polaris-gray-700);
+
+  --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  --texture-opacity: 0.035;
+
   /* ============================================ */
-  /* MAPS (jsvectormap)                           */
+  /* CHART (trend canvas): 墨绿主 / 陶土次        */
   /* ============================================ */
-  
-  --map-colors-primary: var(--color-primary-500);
-  --map-colors-primary-inverse: var(--color-primary-300);
-  --map-colors-default: var(--surface-1);
-  --map-colors-default-inverse: var(--color-polaris-gray-700);
-  --map-colors-highlight: var(--color-primary-300);
-  --map-colors-highlight-inverse: var(--color-primary-500);
-  --map-colors-border: var(--border-line-3);
-  --map-colors-border-inverse: var(--color-polaris-gray-600);
+
+  --chart-primary: var(--color-polaris-600);
+  --chart-colors-grid-border: oklch(91% 0.012 84);
+  --chart-2: var(--color-polaris-tan-500);
+  --chart-3: var(--color-polaris-sage-500);
 }
 
 [data-theme="theme-polaris"].dark {
 
   /* ============================================ */
-  /* DARK MODE - Custom Gray */
+  /* 深色主题: 暖炭土底 (非纯黑) + 墨绿           */
   /* ============================================ */
-  
-  /* BACKGROUNDS */
-  --background: var(--color-polaris-gray-800);
-  --background-1: var(--color-polaris-gray-900);
-  --background-2: var(--color-polaris-gray-950);
-  --background-plain: var(--color-polaris-gray-800);
-  
-  /* TEXT */
-  --foreground: var(--color-polaris-gray-200);
-  --foreground-inverse: var(--color-white);
-  
-  --inverse: var(--color-polaris-gray-950);
-  
+
+  --background: oklch(23% 0.013 78);
+  --background-1: oklch(26% 0.014 80);
+  --background-2: oklch(20.5% 0.013 76); /* 页面画布: 暖炭土 #1b1611, 同 theme-color dark */
+  --background-plain: oklch(22.5% 0.013 78);
+  --foreground: oklch(93% 0.01 88);
+  --foreground-inverse: var(--background-2);
+
+  --inverse: oklch(93% 0.01 88);
+
+  --field: oklch(21.5% 0.013 78);
+  --field-focus: oklch(25.5% 0.014 80);
+
   /* BORDERS */
-  --border: var(--color-polaris-gray-700);
-  --border-line-inverse: var(--color-polaris-gray-200);
-  --border-line-1: var(--color-polaris-gray-800);
-  --border-line-2: var(--color-polaris-gray-700);
-  --border-line-3: var(--color-polaris-gray-600);
-  --border-line-4: var(--color-polaris-gray-500);
-  --border-line-5: var(--color-polaris-gray-400);
-  --border-line-6: var(--color-polaris-gray-300);
-  --border-line-7: var(--color-polaris-gray-200);
-  --border-line-8: var(--color-polaris-gray-100);
-  
-  /* PRIMARY STATES */
-  --primary: var(--color-primary-500);
+  --border: oklch(30.5% 0.014 82);
+  --border-line-inverse: oklch(93% 0.01 88);
+  --border-line-1: oklch(21.5% 0.013 78);
+  --border-line-2: oklch(29.5% 0.014 82);
+  --border-line-3: oklch(36% 0.015 84);
+  --border-line-4: oklch(44% 0.015 82);
+  --border-line-5: oklch(54% 0.015 82);
+  --border-line-6: oklch(64% 0.014 82);
+  --border-line-7: oklch(76% 0.013 84);
+  --border-line-8: oklch(90% 0.012 85);
+
+  /* PRIMARY STATES (深底用亮阶作视觉强调) */
+  --primary: oklch(58% 0.118 158);
   --primary-line: transparent;
-  --primary-foreground: var(--color-white);
-  --primary-hover: var(--color-primary-600);
-  --primary-focus: var(--color-primary-600);
-  --primary-active: var(--color-primary-600);
-  --primary-checked: var(--color-primary-500);
-  
-  /* SECONDARY */
-  --secondary: var(--color-white);
-  --secondary-line: transparent;
-  --secondary-foreground: var(--color-polaris-gray-800);
-  --secondary-hover: var(--color-polaris-gray-100);
-  --secondary-focus: var(--color-polaris-gray-100);
-  --secondary-active: var(--color-polaris-gray-100);
-  
-  /* LAYER */
-  --layer: var(--background);
+  --primary-foreground: oklch(16% 0.01 88);
+  --primary-hover: oklch(63% 0.122 158);
+  --primary-focus: oklch(66% 0.128 158);
+  --primary-active: oklch(52% 0.112 159);
+  --primary-checked: oklch(58% 0.118 158);
+
+  /* SECONDARY (炭色按钮) */
+  --secondary: oklch(30.5% 0.014 82);
+  --secondary-line: oklch(38% 0.015 84);
+  --secondary-foreground: oklch(93% 0.01 88);
+  --secondary-hover: oklch(35% 0.014 83);
+  --secondary-focus: oklch(35% 0.014 83);
+  --secondary-active: oklch(40% 0.015 84);
+
+  /* LAYER / SURFACE / MUTED */
+  --layer: oklch(22.5% 0.013 78);
   --layer-line: var(--border);
-  --layer-foreground: var(--color-white);
-  --layer-hover: var(--color-polaris-gray-700);
-  --layer-focus: var(--color-polaris-gray-700);
-  --layer-active: var(--color-polaris-gray-700);
-  
-  /* SURFACE */
-  --surface: var(--color-polaris-gray-700);
-  --surface-1: var(--color-polaris-gray-600);
-  --surface-2: var(--color-polaris-gray-500);
-  --surface-3: var(--color-polaris-gray-600);
-  --surface-4: var(--color-polaris-gray-500);
-  --surface-5: var(--color-polaris-gray-400);
+  --layer-foreground: oklch(93% 0.01 88);
+  --layer-hover: oklch(27.5% 0.014 80);
+  --layer-focus: oklch(27.5% 0.014 80);
+  --layer-active: oklch(27.5% 0.014 80);
+
+  --surface: oklch(28.5% 0.014 82);
+  --surface-1: oklch(32% 0.014 82);
+  --surface-2: oklch(38% 0.015 84);
+  --surface-3: oklch(45% 0.015 83);
+  --surface-4: oklch(54% 0.014 82);
+  --surface-5: oklch(64% 0.014 82);
   --surface-line: transparent;
-  --surface-foreground: var(--color-polaris-gray-200);
-  --surface-hover: var(--color-polaris-gray-600);
-  --surface-focus: var(--color-polaris-gray-600);
-  --surface-active: var(--color-polaris-gray-600);
-  
-  /* MUTED */
-  --muted: var(--color-polaris-gray-800);
-  --muted-foreground: var(--color-polaris-gray-500);
-  --muted-foreground-1: var(--color-polaris-gray-400);
-  --muted-foreground-2: var(--color-polaris-gray-300);
-  --muted-hover: var(--color-polaris-gray-700);
-  --muted-focus: var(--color-polaris-gray-700);
-  --muted-active: var(--color-polaris-gray-700);
-  
-  /* DESTRUCTIVE */
-  --destructive: var(--color-red-500);
-  --destructive-foreground: var(--color-white);
-  --destructive-hover: var(--color-red-600);
-  --destructive-focus: var(--color-red-600);
-  
-  /* NAVBAR */
-  --navbar: var(--background);
-  --navbar-line: var(--border);
-  --navbar-divider: var(--border);
-  --navbar-nav-foreground: var(--foreground);
-  --navbar-nav-hover: var(--muted-hover);
-  --navbar-nav-focus: var(--muted-hover);
-  --navbar-nav-active: var(--muted-hover);
-  --navbar-nav-list-divider: var(--border);
-  --navbar-inverse: var(--inverse);
-  
-  --navbar-1: var(--background-1);
-  --navbar-1-line: var(--border);
-  --navbar-1-divider: var(--border);
-  --navbar-1-nav-foreground: var(--foreground);
-  --navbar-1-nav-hover: var(--surface);
-  --navbar-1-nav-focus: var(--surface);
-  --navbar-1-nav-active: var(--surface);
-  --navbar-1-nav-list-divider: var(--border);
-  
-  --navbar-2: var(--background-2);
-  --navbar-2-line: transparent;
-  --navbar-2-divider: var(--border);
-  --navbar-2-nav-foreground: var(--foreground);
-  --navbar-2-nav-hover: var(--surface);
-  --navbar-2-nav-focus: var(--surface);
-  --navbar-2-nav-active: var(--surface);
-  --navbar-2-nav-list-divider: var(--border);
-  
-  /* SIDEBAR */
-  --sidebar: var(--background);
-  --sidebar-line: var(--border);
-  --sidebar-divider: var(--border);
-  --sidebar-nav-foreground: var(--foreground);
-  --sidebar-nav-hover: var(--muted-hover);
-  --sidebar-nav-focus: var(--muted-hover);
-  --sidebar-nav-active: var(--muted-hover);
-  --sidebar-nav-list-divider: var(--border);
-  --sidebar-inverse: var(--inverse);
-  
-  --sidebar-1: var(--background-1);
-  --sidebar-1-line: var(--border);
-  --sidebar-1-divider: var(--border);
-  --sidebar-1-nav-foreground: var(--foreground);
-  --sidebar-1-nav-hover: var(--surface);
-  --sidebar-1-nav-focus: var(--surface);
-  --sidebar-1-nav-active: var(--surface);
-  --sidebar-1-nav-list-divider: var(--border);
-  
-  --sidebar-2: var(--background-2);
-  --sidebar-2-line: transparent;
-  --sidebar-2-divider: var(--border);
-  --sidebar-2-nav-foreground: var(--foreground);
-  --sidebar-2-nav-hover: var(--surface);
-  --sidebar-2-nav-focus: var(--surface);
-  --sidebar-2-nav-active: var(--surface);
-  --sidebar-2-nav-list-divider: var(--border);
-  
-  /* CARD */
-  --card: var(--background);
-  --card-line: var(--border);
-  --card-divider: var(--border);
-  --card-header: var(--surface);
-  --card-footer: var(--surface);
-  --card-inverse: var(--inverse);
-  
-  /* DROPDOWN */
-  --dropdown: var(--background-1);
-  --dropdown-1: var(--background-2);
-  --dropdown-line: transparent;
-  --dropdown-divider: var(--border);
-  --dropdown-header: var(--surface);
-  --dropdown-footer: var(--surface);
-  --dropdown-item-foreground: var(--foreground);
-  --dropdown-item-hover: var(--muted-hover);
-  --dropdown-item-focus: var(--muted-hover);
-  --dropdown-item-active: var(--muted-hover);
-  --dropdown-inverse: var(--inverse);
-  
-  /* SELECT */
-  --select: var(--background-1);
-  --select-1: var(--background-2);
-  --select-line: transparent;
-  --select-item-foreground: var(--foreground);
-  --select-item-hover: var(--muted-hover);
-  --select-item-focus: var(--muted-hover);
-  --select-item-active: var(--muted-hover);
-  --select-inverse: var(--inverse);
-  
-  /* OVERLAY */
-  --overlay: var(--background);
-  --overlay-line: transparent;
-  --overlay-divider: var(--border);
-  --overlay-header: var(--surface);
-  --overlay-footer: var(--surface);
-  --overlay-inverse: var(--inverse);
-  
-  /* POPOVER */
-  --popover: var(--background-1);
-  --popover-line: var(--border);
-  
-  /* TOOLTIP */
-  --tooltip: var(--color-white);
-  --tooltip-foreground: var(--color-polaris-gray-800);
+  --surface-foreground: oklch(93% 0.01 88);
+  --surface-hover: oklch(32% 0.014 82);
+  --surface-focus: oklch(32% 0.014 82);
+  --surface-active: oklch(32% 0.014 82);
+
+  --muted: oklch(22.5% 0.013 78);
+  --muted-foreground: oklch(74% 0.013 84);
+  --muted-foreground-1: oklch(66% 0.013 84);
+  --muted-foreground-2: oklch(58% 0.012 84);
+  --muted-hover: oklch(29.5% 0.014 82);
+  --muted-focus: oklch(29.5% 0.014 82);
+  --muted-active: oklch(32% 0.014 82);
+
+  /* DESTRUCTIVE (暖陶红, 深底亮一阶) */
+  --destructive: oklch(64% 0.16 38);
+  --destructive-foreground: oklch(15% 0.01 88);
+  --destructive-hover: oklch(69% 0.16 38);
+  --destructive-focus: oklch(69% 0.16 38);
+  --destructive-active: oklch(59% 0.15 37);
+
+  /* NAVBAR / SIDEBAR (深炭) */
+  --navbar: oklch(21.5% 0.013 78);
+  --navbar-line: transparent;
+  --navbar-divider: oklch(28% 0.014 82);
+  --navbar-nav-foreground: oklch(93% 0.01 88);
+  --navbar-nav-hover: oklch(28.5% 0.014 82);
+  --navbar-nav-focus: oklch(28.5% 0.014 82);
+  --navbar-nav-active: oklch(28.5% 0.014 82);
+  --navbar-nav-list-divider: oklch(28% 0.014 82);
+  --navbar-inverse: oklch(93% 0.01 88);
+
+  --sidebar: oklch(22.5% 0.013 78);
+  --sidebar-line: transparent;
+  --sidebar-divider: oklch(27% 0.014 80);
+  --sidebar-nav-foreground: oklch(93% 0.01 88);
+  --sidebar-nav-hover: oklch(27.5% 0.014 80);
+  --sidebar-nav-focus: oklch(27.5% 0.014 80);
+  --sidebar-nav-active: oklch(27.5% 0.014 80);
+  --sidebar-nav-list-divider: oklch(27% 0.014 80);
+  --sidebar-inverse: oklch(93% 0.01 88);
+
+  /* CARD / DROPDOWN / OVERLAY / POPOVER (土炭纸面) */
+  --card: oklch(25.5% 0.014 80);
+  --card-line: transparent;
+  --card-divider: oklch(29% 0.014 82);
+  --card-header: oklch(25.5% 0.014 80);
+  --card-footer: oklch(23.5% 0.013 78);
+  --card-inverse: oklch(93% 0.01 88);
+
+  --dropdown: oklch(27% 0.014 80);
+  --dropdown-line: oklch(36% 0.015 84);
+  --dropdown-divider: oklch(30.5% 0.014 82);
+  --dropdown-header: oklch(29.5% 0.014 82);
+  --dropdown-footer: oklch(29.5% 0.014 82);
+  --dropdown-item-foreground: oklch(93% 0.01 88);
+  --dropdown-item-hover: oklch(31.5% 0.014 82);
+  --dropdown-item-focus: oklch(31.5% 0.014 82);
+  --dropdown-item-active: oklch(31.5% 0.014 82);
+  --dropdown-inverse: oklch(93% 0.01 88);
+
+  --overlay: oklch(25.5% 0.014 80);
+  --overlay-line: oklch(30.5% 0.014 82);
+  --overlay-divider: oklch(30.5% 0.014 82);
+  --overlay-header: oklch(27% 0.014 80);
+  --overlay-footer: oklch(27% 0.014 80);
+  --overlay-inverse: oklch(93% 0.01 88);
+
+  --popover: oklch(27% 0.014 80);
+  --popover-line: oklch(36% 0.015 84);
+
+  /* TOOLTIP (深底用米色文字) */
+  --tooltip: oklch(93% 0.01 88);
+  --tooltip-foreground: oklch(16% 0.01 88);
   --tooltip-line: transparent;
-  
-  /* TABLE */
-  --table-line: var(--border);
-  
-  /* SWITCH */
-  --switch: var(--color-white);
-  
-  /* FOOTER */
-  --footer: var(--background);
-  --footer-line: var(--border);
-  --footer-inverse: var(--inverse);
-  
+
+  --table-line: oklch(28.5% 0.014 82);
+
+  --switch: oklch(93% 0.01 88);
+
+  --footer: oklch(22% 0.013 78);
+  --footer-line: oklch(28% 0.014 82);
+  --footer-inverse: oklch(93% 0.01 88);
+
   /* SCROLLBAR */
-  --scrollbar-track: var(--surface);
-  --scrollbar-thumb: var(--surface-3);
-  --scrollbar-track-inverse: var(--surface-4);
-  --scrollbar-thumb-inverse: var(--surface-2);
-  /* CHARTS - dark mode adjustments */
-  --chart-colors-background: var(--background);
-  --chart-colors-background-inverse: var(--color-polaris-gray-100);
-  --chart-colors-chart-inverse: var(--background-1);
-  --chart-colors-foreground: var(--color-polaris-gray-300);
-  --chart-colors-foreground-inverse: var(--color-white);
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: oklch(38.5% 0.015 84);
+  --scrollbar-thumb-hover: oklch(48.5% 0.014 82);
 
-  --chart-primary: var(--color-primary-500);
-  --chart-colors-primary: var(--color-primary-500);
-  --chart-colors-primary-inverse: var(--color-primary-300);
-  --chart-colors-primary-hex: var(--color-primary-500);
-  --chart-colors-primary-hex-inverse: var(--color-primary-300);
-  --chart-1: var(--color-primary-200);
-  --chart-colors-chart-1: var(--color-primary-200);
-  --chart-colors-chart-1-inverse: var(--color-primary-300);
-  --chart-colors-chart-1-hex: var(--color-primary-200);
-  --chart-colors-chart-1-hex-inverse: var(--color-primary-300);
-  --chart-2: var(--color-primary-300);
-  --chart-colors-chart-2: var(--color-primary-300);
-  --chart-colors-chart-2-inverse: var(--color-primary-400);
-  --chart-colors-chart-2-hex: var(--color-primary-300);
-  --chart-colors-chart-2-hex-inverse: var(--color-primary-400);
-  --chart-3: var(--color-primary-400);
-  --chart-colors-chart-3: var(--color-primary-400);
-  --chart-colors-chart-3-inverse: var(--color-primary-500);
-  --chart-colors-chart-3-hex: var(--color-primary-400);
-  --chart-colors-chart-3-hex-inverse: var(--color-primary-500);
-  --chart-4: var(--color-primary-500);
-  --chart-colors-chart-4: var(--color-primary-500);
-  --chart-colors-chart-4-inverse: var(--color-primary-600);
-  --chart-colors-chart-4-hex: var(--color-primary-500);
-  --chart-colors-chart-4-hex-inverse: var(--color-primary-600);
-  --chart-5: var(--color-primary-300);
-  --chart-colors-chart-5: var(--color-primary-300);
-  --chart-colors-chart-5-inverse: var(--color-primary-500);
-  --chart-colors-chart-5-hex: var(--color-primary-300);
-  --chart-colors-chart-5-hex-inverse: var(--color-primary-500);
-  --chart-6: var(--color-sky-400);
-  --chart-colors-chart-6: var(--color-sky-400);
-  --chart-colors-chart-6-inverse: var(--color-sky-300);
-  --chart-colors-chart-6-hex: var(--color-sky-400);
-  --chart-colors-chart-6-hex-inverse: var(--color-sky-300);
-  --chart-7: var(--color-emerald-400);
-  --chart-colors-chart-7: var(--color-emerald-400);
-  --chart-colors-chart-7-inverse: var(--color-emerald-300);
-  --chart-colors-chart-7-hex: var(--color-emerald-400);
-  --chart-colors-chart-7-hex-inverse: var(--color-emerald-300);
-  --chart-8: var(--color-violet-400);
-  --chart-colors-chart-8: var(--color-violet-400);
-  --chart-colors-chart-8-inverse: var(--color-violet-300);
-  --chart-colors-chart-8-hex: var(--color-violet-400);
-  --chart-colors-chart-8-hex-inverse: var(--color-violet-300);
-  --chart-9: var(--color-rose-400);
-  --chart-colors-chart-9: var(--color-rose-400);
-  --chart-colors-chart-9-inverse: var(--color-rose-300);
-  --chart-colors-chart-9-hex: var(--color-rose-400);
-  --chart-colors-chart-9-hex-inverse: var(--color-rose-300);
-  --chart-10: var(--color-polaris-gray-300);
-  --chart-colors-chart-10: var(--color-polaris-gray-300);
-  --chart-colors-chart-10-inverse: var(--color-polaris-gray-500);
-  --chart-colors-chart-10-hex: var(--color-polaris-gray-300);
-  --chart-colors-chart-10-hex-inverse: var(--color-polaris-gray-500);
+  /* 深色噪点纹理: 白噪点更稀薄 */
+  --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  --texture-opacity: 0.05;
 
-  --chart-colors-labels: var(--color-polaris-gray-400);
-  --chart-colors-xaxis-labels: var(--color-polaris-gray-400);
-  --chart-colors-yaxis-labels: var(--color-polaris-gray-400);
-  --chart-colors-grid-border: var(--border);
-  --chart-colors-bar-ranges: var(--surface);
-  
-  /* MAPS - dark mode adjustments */
-  --map-colors-default: var(--surface);
-  --map-colors-default-inverse: var(--surface-2);
-  --map-colors-border: var(--border-line-3);
-  --map-colors-border-inverse: var(--border-line-4);
+  /* CHART: 深底提亮绿, 陶土点缀 */
+  --chart-primary: oklch(72% 0.1 158);
+  --chart-colors-grid-border: oklch(30.5% 0.014 82);
+  --chart-2: oklch(74% 0.085 60);
+  --chart-3: oklch(74% 0.06 126);
 }

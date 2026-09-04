@@ -30,10 +30,7 @@ export default function JobsPage() {
   return (
     <Show when={jobs()} fallback={<SkeletonRows rows={5} />}>
       <div class="px-rise">
-        <div class="mb-5">
-          <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">定时任务</h2>
-          <p class="mt-1 text-[13px] text-muted-foreground-2">插件注册的定时任务，可单独暂停或恢复，状态实时同步</p>
-        </div>
+        <h2 class="mb-6 font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">定时任务</h2>
         <Card>
           <div class="overflow-x-auto">
             <table class="w-full text-[13px]">
@@ -50,7 +47,7 @@ export default function JobsPage() {
               <tbody>
                 <For each={jobs()} fallback={<tr><td colspan={6}><Empty text="暂无已注册的定时任务" /></td></tr>}>
                   {(job) => (
-                    <tr class="border-t border-border transition-colors duration-100 hover:bg-muted-hover">
+                    <tr class="border-t border-card-divider transition-colors duration-300 hover:bg-muted-hover">
                       <td class="px-5 py-3">
                         <b class="font-medium text-foreground">{job.id}</b>
                         {job.immediate && <span class="text-muted-foreground-2"> 启动即触发</span>}

@@ -10,8 +10,8 @@ const LEVEL_WEIGHT: Record<string, number> = { DEBUG: 0, INFO: 1, WARN: 2, ERROR
 const LEVEL_PILL: Record<string, string> = {
   DEBUG: 'text-muted-foreground-2',
   INFO: 'text-muted-foreground',
-  WARN: 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
-  ERROR: 'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-300',
+  WARN: 'bg-amber-50 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
+  ERROR: 'bg-red-50 text-red-600 dark:bg-red-400/15 dark:text-red-300',
 }
 
 // 合并历史快照与本地实时补丁: 以服务端为基准, 补回比快照更新的本地条目, 防止丢尾
@@ -106,16 +106,15 @@ export default function LogsPage() {
   return (
     <div class="px-rise flex min-h-0 flex-1 flex-col gap-4">
       <div>
-        <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">日志</h2>
-        <p class="mt-1 text-[13px] text-muted-foreground-2">级别与来源筛选，实时推送；内存环形缓冲保留最近 2048 条</p>
+        <h2 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">日志</h2>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <div class="inline-flex gap-0.5 rounded-[10px] border border-line-3 bg-card p-1 shadow-sm">
+        <div class="inline-flex gap-0.5 rounded-full border border-line-3 bg-card p-1 shadow-sm">
           <For each={LEVELS}>
             {(lv) => (
               <button
-                class={`rounded-lg px-2.5 py-1 text-[12.5px] transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+                class={`rounded-full px-3 py-1 text-[12.5px] transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
                   level() === lv ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-400/15 dark:text-primary-300' : 'text-muted-foreground hover:text-foreground'
                 }`}
                 onClick={() => setLevel(lv)}
@@ -126,7 +125,7 @@ export default function LogsPage() {
           </For>
         </div>
         <select
-          class="h-9 rounded-lg border border-line-3 bg-card px-3 text-[12.5px] text-foreground outline-none transition-colors duration-150 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+          class="h-9 rounded-full border border-line-3 bg-field px-3.5 text-[12.5px] text-foreground outline-none transition-colors duration-300 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
           value={scope()}
           onChange={(e) => setScope(e.currentTarget.value)}
         >
@@ -136,9 +135,9 @@ export default function LogsPage() {
           </For>
         </select>
         <div class="relative">
-          <Icon name="search" size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground-2" />
+          <Icon name="search" size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-2" />
           <input
-            class="h-9 w-[220px] rounded-lg border border-line-3 bg-card pl-8 pr-3 text-[12.5px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+            class="h-9 w-[220px] rounded-full border border-line-3 bg-field pl-8 pr-3.5 text-[12.5px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
             placeholder="搜索日志内容"
             value={query()}
             onInput={(e) => setQuery(e.currentTarget.value)}
@@ -157,7 +156,7 @@ export default function LogsPage() {
       </div>
 
       <Card class="relative flex min-h-[320px] flex-1 flex-col overflow-hidden">
-        <div class="grid shrink-0 grid-cols-[150px_56px_92px_1fr] gap-3 border-b border-border px-5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground-2">
+        <div class="grid shrink-0 grid-cols-[150px_56px_92px_1fr] gap-3 border-b border-card-divider px-5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground-2">
           <span>时间</span>
           <span>级别</span>
           <span class="max-sm:hidden">来源</span>
@@ -167,9 +166,9 @@ export default function LogsPage() {
           <div class="min-h-0 flex-1 overflow-y-auto" ref={listEl} onScroll={onListScroll}>
             <For each={filtered().slice(0, 800)}>
               {(e) => (
-                <div class="px-rise grid grid-cols-[150px_56px_92px_1fr] items-baseline gap-3 border-b border-border px-5 py-[4.5px] font-mono text-[12.3px] tnum transition-colors duration-100 last:border-b-0 hover:bg-muted-hover">
+                <div class="px-rise grid grid-cols-[150px_56px_92px_1fr] items-baseline gap-3 border-b border-card-divider px-5 py-[4.5px] font-mono text-[12.3px] tnum transition-colors duration-300 last:border-b-0 hover:bg-muted-hover">
                   <span class="whitespace-nowrap text-muted-foreground-2">{fmtTime(e.time)}</span>
-                  <span class={`inline-block justify-self-start rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider ${LEVEL_PILL[e.level] ?? LEVEL_PILL.INFO}`}>
+                  <span class={`inline-block justify-self-start rounded-full px-2 py-px text-[10px] font-semibold uppercase tracking-wider ${LEVEL_PILL[e.level] ?? LEVEL_PILL.INFO}`}>
                     {e.level}
                   </span>
                   <span class="truncate text-primary-600 dark:text-primary-400">{e.scope}</span>
@@ -180,7 +179,7 @@ export default function LogsPage() {
           </div>
           <Show when={!following() && live()}>
             <button
-              class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line-3 bg-card px-4 py-1.5 text-[12.5px] text-foreground shadow-lg transition-colors duration-150 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
+              class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line-3 bg-card px-4 py-1.5 text-[12.5px] text-foreground shadow-md transition-colors duration-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
               onClick={backToLatest}
             >
               <Icon name="chevron" size={14} class="rotate-180" />

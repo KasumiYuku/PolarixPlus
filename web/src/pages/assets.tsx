@@ -52,15 +52,12 @@ export default function AssetsPage() {
   return (
     <Show when={view()} fallback={<SkeletonRows rows={6} />}>
       <div class="px-rise">
-        <div class="mb-5">
-          <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">图床</h2>
-          <p class="mt-1 text-[13px] text-muted-foreground-2">图片托管 Provider 聚合与白名单直通规则</p>
-        </div>
+        <h2 class="mb-6 font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">图床</h2>
 
         <Card title="白名单域名前缀" actions={<span class="text-xs text-muted-foreground-2">命中的图片 URL 直通，不经过图床上传</span>}>
-          <div class="px-5 py-4">
+          <div class="px-6 py-5">
             <textarea
-              class="w-full rounded-lg border border-line-3 bg-background px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+              class="w-full rounded-[1.4rem] border border-line-3 bg-field px-4 py-3 font-mono text-xs leading-relaxed text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
               rows={4}
               placeholder={'每行一个域名前缀，如 https://q.qlogo.cn'}
               value={whitelist()}
@@ -73,10 +70,10 @@ export default function AssetsPage() {
           title="Provider"
           actions={<Button variant="primary" onClick={save} disabled={busy()}>{busy() ? '保存中…' : '保存全部'}</Button>}
         >
-          <div class="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
             <For each={providers()}>
               {(p) => (
-                <div class={`flex flex-col gap-2.5 rounded-xl border border-line-2 p-4 transition-all duration-200 hover:border-line-4 ${p.enabled ? '' : 'opacity-60'}`}>
+                <div class={`px-blob flex flex-col gap-3 border border-line-2 bg-card p-5 shadow-sm transition-all duration-500 hover:border-primary-500/30 ${p.enabled ? '' : 'opacity-60'}`}>
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex min-w-0 items-center gap-2">
                       <b class="truncate text-[13.5px] font-semibold text-foreground">{p.name}</b>
@@ -88,19 +85,19 @@ export default function AssetsPage() {
                   <div class="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                     <span>优先级</span>
                     <button
-                      class="inline-grid h-7 w-7 place-items-center rounded-lg border border-line-3 bg-card text-muted-foreground transition-colors duration-150 hover:border-line-4 hover:text-foreground"
+                      class="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-full border border-line-3 bg-card text-muted-foreground transition-all duration-300 hover:border-line-4 hover:text-foreground active:translate-y-px"
                       onClick={() => patchProvider(p.name, { priority: Math.max(0, p.priority - 10) })}
                     >
                       −
                     </button>
                     <input
-                      class="h-7 w-16 rounded-lg border border-line-3 bg-card text-center font-mono text-xs text-foreground outline-none transition-colors duration-150 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+                      class="h-7 w-16 rounded-full border border-line-3 bg-field text-center font-mono text-xs text-foreground outline-none transition-colors duration-300 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
                       type="number"
                       value={p.priority}
                       onInput={(e) => patchProvider(p.name, { priority: Number(e.currentTarget.value) || 0 })}
                     />
                     <button
-                      class="inline-grid h-7 w-7 place-items-center rounded-lg border border-line-3 bg-card text-muted-foreground transition-colors duration-150 hover:border-line-4 hover:text-foreground"
+                      class="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-full border border-line-3 bg-card text-muted-foreground transition-all duration-300 hover:border-line-4 hover:text-foreground active:translate-y-px"
                       onClick={() => patchProvider(p.name, { priority: p.priority + 10 })}
                     >
                       +
@@ -130,7 +127,7 @@ export default function AssetsPage() {
 function SchemaInput(props: { field: { key: string; label: string; description?: string; type: string; required?: boolean; default?: unknown }; value: unknown; onChange: (v: unknown) => void }) {
   const f = props.field
   const inputCls =
-    'h-9 w-full rounded-lg border border-line-3 bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30'
+    'h-10 w-full rounded-full border border-line-3 bg-field px-5 text-[13px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30'
   if (f.type === 'boolean') {
     return <Switch checked={!!props.value} onChange={props.onChange} />
   }

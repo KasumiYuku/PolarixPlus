@@ -155,30 +155,44 @@ func (h *ImageHost) ImgToURL(src string) (ResolvedImage, error) {
 // ProcessMarkdown 处理 markdown 中的图片引用：local/base64 上传图床，替换为
 // ![alt #wpx #hpx](公网URL)。公网 URL / 白名单命中时原样保留（含已带尺寸标注），
 // 避免二次处理丢失信息；图床上传失败时保持原样。
+// 图片行后统一保证换行：后续行首语法（引用、列表等）不会被图片行吞掉。
 func (h *ImageHost) ProcessMarkdown(input string) string {
 	if h == nil || len(h.providers) == 0 {
 		return input
 	}
-	return imgRe.ReplaceAllStringFunc(input, func(match string) string {
-		m := imgRe.FindStringSubmatch(match)
-		if len(m) < 3 {
-			return match
+	var b strings.Builder
+	last := 0
+	for _, loc := range imgRe.FindAllStringSubmatchIndex(input, -1) {
+		start, end := loc[0], loc[1]
+		b.WriteString(input[last:start])
+		alt, src := input[loc[2]:loc[3]], input[loc[4]:loc[5]]
+		b.WriteString(h.replaceImage(alt, src))
+		// 图片行后补一个换行；原文已是换行/行尾则不重复追加
+		if end >= len(input) || input[end] != '\n' {
+			b.WriteByte('\n')
 		}
-		alt, src := m[1], m[2]
-		resolved, err := h.ImgToURL(src)
-		if err != nil {
-			return match
-		}
-		// 公网 URL / 白名单直通：URL 未变则原样返回，保留 alt 中已有的尺寸标注
-		if resolved.URL == src {
-			return match
-		}
-		// alt 已带尺寸标注（#Wpx #Hpx）时不再重复追加
-		if resolved.Width > 0 && resolved.Height > 0 && !dimRe.MatchString(alt) {
-			return fmt.Sprintf("![%s #%dpx #%dpx](%s)\n", alt, resolved.Width, resolved.Height, resolved.URL)
-		}
-		return fmt.Sprintf("![%s](%s)\n", alt, resolved.URL)
-	})
+		last = end
+	}
+	b.WriteString(input[last:])
+	return b.String()
+}
+
+// replaceImage 单张图片替换：公网 URL / 白名单直通（含 alt 已有尺寸标注），
+// local/base64 上传图床并按需追加尺寸标注。
+func (h *ImageHost) replaceImage(alt, src string) string {
+	resolved, err := h.ImgToURL(src)
+	if err != nil {
+		return fmt.Sprintf("![%s](%s)", alt, src)
+	}
+	// 公网 URL / 白名单直通：URL 未变则原样保留，保留 alt 中已有的尺寸标注
+	if resolved.URL == src {
+		return fmt.Sprintf("![%s](%s)", alt, src)
+	}
+	// alt 已带尺寸标注（#Wpx #Hpx）时不再重复追加
+	if resolved.Width > 0 && resolved.Height > 0 && !dimRe.MatchString(alt) {
+		return fmt.Sprintf("![%s #%dpx #%dpx](%s)", alt, resolved.Width, resolved.Height, resolved.URL)
+	}
+	return fmt.Sprintf("![%s](%s)", alt, resolved.URL)
 }
 
 // isLocal 判断 src 是否需要上传：本地文件、内网、base64 data URL 为 true；公网 URL 为 false。

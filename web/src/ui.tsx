@@ -17,14 +17,9 @@ const ICONS = {
   play: 'M7 4l13 8-13 8z',
   sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
-  monitor: 'M2 4h20v13H2zM8 21h8M12 17v4',
-  back: 'M15 18l-6-6 6-6',
   x: 'M18 6L6 18M6 6l12 12',
   check: 'M20 6L9 17l-5-5',
   alert: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01',
-  download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
-  square: 'M6 6h12v12H6z',
-  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
   info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
   chevron: 'M6 9l6 6 6-6',
@@ -53,16 +48,14 @@ export function Icon(props: { name: IconName; size?: number; class?: string }) {
   )
 }
 
-// ---------- 按钮 ----------
+// ---------- 按钮 (有机胶囊) ----------
 
 type BtnVariant = 'primary' | 'ghost' | 'danger' | 'soft'
 const BTN: Record<BtnVariant, string> = {
-  primary:
-    'bg-primary-600 text-white shadow-sm hover:bg-primary-700 active:bg-primary-800 disabled:hover:bg-primary-600',
-  ghost: 'bg-secondary text-secondary-foreground shadow-sm border border-line-3 hover:bg-surface',
-  danger:
-    'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive-hover active:brightness-95 disabled:hover:bg-destructive',
-  soft: 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-400/10 dark:text-primary-300 dark:hover:bg-primary-400/20',
+  primary: 'bg-primary-600 text-primary-foreground shadow-sm hover:bg-primary-700 active:bg-primary-800 disabled:hover:bg-primary-600',
+  ghost: 'bg-secondary text-secondary-foreground border border-line-3 shadow-sm hover:bg-secondary-hover active:bg-secondary-active',
+  danger: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive-hover active:brightness-95 disabled:hover:bg-destructive',
+  soft: 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-400/15 dark:text-primary-300 dark:hover:bg-primary-400/25',
 }
 
 export function Button(props: {
@@ -77,7 +70,7 @@ export function Button(props: {
   return (
     <button
       type={props.type ?? 'button'}
-      class={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium transition-[background-color,box-shadow,opacity] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:pointer-events-none disabled:opacity-50 ${BTN[props.variant ?? 'ghost']} ${props.class ?? ''}`}
+      class={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4.5 text-[13px] font-medium transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px ${BTN[props.variant ?? 'ghost']} ${props.class ?? ''}`}
       disabled={props.disabled}
       onClick={props.onClick}
       title={props.title}
@@ -97,23 +90,23 @@ export function Switch(props: { checked: boolean; onChange: (v: boolean) => void
       aria-checked={props.checked}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      class={`relative inline-flex h-[22px] w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:cursor-not-allowed disabled:opacity-50 ${props.checked ? 'bg-primary-600' : 'bg-surface-3 dark:bg-surface-2'}`}
+      class={`relative inline-flex h-[24px] w-10 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:cursor-not-allowed disabled:opacity-50 ${props.checked ? 'bg-primary-600' : 'bg-surface-3 dark:bg-surface-2'}`}
     >
       <span
-        class={`pointer-events-none inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow transition-transform duration-200 ${props.checked ? 'translate-x-[18px]' : 'translate-x-0'}`}
+        class={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${props.checked ? 'translate-x-5' : 'translate-x-0'}`}
       />
     </button>
   )
 }
 
-// ---------- 卡片 ----------
+// ---------- 卡片 (不规则圆角纸片) ----------
 
 export function Card(props: { title?: JSX.Element; actions?: JSX.Element; children: JSX.Element; class?: string }) {
   return (
-    <section class={`rounded-xl border border-line-2 bg-card shadow-sm ${props.class ?? ''}`}>
+    <section class={`px-blob border border-line-2 bg-card ${props.class ?? ''}`}>
       <Show when={props.title || props.actions}>
-        <header class="flex min-h-[49px] items-center justify-between gap-3 border-b border-card-divider px-5">
-          <h3 class="text-[13.5px] font-semibold tracking-[-0.005em] text-foreground">{props.title}</h3>
+        <header class="flex min-h-[54px] items-center justify-between gap-3 border-b border-card-divider px-6">
+          <h3 class="font-display text-[15.5px] font-semibold text-foreground">{props.title}</h3>
           <div class="flex items-center gap-2">{props.actions}</div>
         </header>
       </Show>
@@ -126,11 +119,11 @@ export function Card(props: { title?: JSX.Element; actions?: JSX.Element; childr
 
 export function Field(props: { label: string; desc?: string; children: JSX.Element; wide?: boolean }) {
   return (
-    <div class={`grid gap-2.5 border-b border-border py-4 pl-5 pr-6 last:border-b-0 ${props.wide ? 'grid-cols-1' : 'sm:grid-cols-[minmax(0,240px)_1fr]'}`}>
+    <div class={`grid gap-3 border-b border-card-divider px-6 py-5 last:border-b-0 ${props.wide ? 'grid-cols-1' : 'sm:grid-cols-[minmax(0,220px)_1fr] sm:items-start'}`}>
       <div class="min-w-0">
         <label class="text-[13px] font-medium text-foreground">{props.label}</label>
         <Show when={props.desc}>
-          <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground-2">{props.desc}</p>
+          <p class="mt-1 text-xs leading-relaxed text-muted-foreground-2">{props.desc}</p>
         </Show>
       </div>
       <div class="min-w-0 sm:max-w-[560px]">{props.children}</div>
@@ -159,16 +152,16 @@ let toastSeq = 0
 export function toast(text: string, kind: ToastKind = 'ok') {
   const id = ++toastSeq
   setToasts((list) => [...list.slice(-4), { id, kind, text }])
-  setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3200)
+  setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3400)
 }
 
 export function Toasts() {
   return (
-    <div class="pointer-events-none fixed right-4 top-4 z-[100] flex w-[min(92vw,380px)] flex-col gap-2" aria-live="polite">
+    <div class="pointer-events-none fixed right-5 top-5 z-[120] flex w-[min(92vw,380px)] flex-col gap-2.5" aria-live="polite">
       <For each={toasts()}>
         {(item) => (
           <div
-            class={`px-toast-in pointer-events-auto flex items-center gap-2.5 rounded-xl border border-line-3 bg-card px-4 py-3 text-[13px] text-foreground shadow-lg`}
+            class={`px-toast-in pointer-events-auto flex items-center gap-3 rounded-full border border-line-3 bg-card px-5 py-3 text-[13px] text-foreground shadow-md`}
           >
             <Icon name={TOAST_ICON[item.kind]} size={16} class={TOAST_ACCENT[item.kind]} />
             <span class="break-words">{item.text}</span>
@@ -190,22 +183,23 @@ export function Modal(props: {
 }) {
   return (
     <Show when={props.open}>
-      <div class="px-fade fixed inset-0 z-[90] grid place-items-center bg-black/50 p-5 backdrop-blur-[2px]" onClick={props.onClose}>
+      <div class="px-fade fixed inset-0 z-[110] grid place-items-center bg-[color-mix(in_srgb,var(--background-2)_55%,transparent)] p-5 backdrop-blur-[3px]" onClick={props.onClose}>
         <div
-          class="px-pop w-full max-w-[460px] overflow-hidden rounded-2xl border border-line-3 bg-card shadow-2xl"
+          class="px-pop w-full max-w-[480px] overflow-hidden border border-line-3 bg-card shadow-md"
+          style={{ 'border-radius': '1.9rem 2.1rem 1.7rem 2.3rem' }}
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
         >
-          <header class="flex items-center justify-between border-b border-card-divider px-5 py-3.5">
-            <h3 class="text-[15px] font-semibold text-foreground">{props.title}</h3>
+          <header class="flex items-center justify-between border-b border-card-divider px-6 py-4">
+            <h3 class="font-display text-[16.5px] font-semibold text-foreground">{props.title}</h3>
             <IconBtn onClick={props.onClose} title="关闭">
               <Icon name="x" size={16} />
             </IconBtn>
           </header>
-          <div class="px-5 py-4 text-[13.5px] leading-relaxed text-muted-foreground">{props.children}</div>
+          <div class="px-6 py-5 text-[13.5px] leading-relaxed text-muted-foreground">{props.children}</div>
           <Show when={props.footer}>
-            <footer class="flex justify-end gap-2 border-t border-card-divider bg-card-footer px-5 py-3.5">{props.footer}</footer>
+            <footer class="flex justify-end gap-2.5 border-t border-card-divider bg-card-footer px-6 py-4">{props.footer}</footer>
           </Show>
         </div>
       </div>
@@ -221,7 +215,7 @@ export function IconBtn(props: { onClick?: (e: MouseEvent) => void; children?: J
       type="button"
       title={props.title}
       onClick={props.onClick}
-      class={`inline-grid h-7 w-7 place-items-center rounded-lg border border-line-3 bg-card text-muted-foreground transition-colors duration-150 outline-none hover:border-line-4 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary-500/40 ${props.class ?? ''}`}
+      class={`inline-grid h-8 w-8 cursor-pointer place-items-center rounded-full border border-line-3 bg-card text-muted-foreground transition-all duration-300 outline-none hover:border-line-4 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary-500/40 active:translate-y-px ${props.class ?? ''}`}
     >
       {props.children}
     </button>
@@ -231,17 +225,17 @@ export function IconBtn(props: { onClick?: (e: MouseEvent) => void; children?: J
 // ---------- 通用小组件 ----------
 
 const BADGE: Record<string, string> = {
-  ok: 'border-transparent bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-300',
-  warn: 'border-transparent bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
-  err: 'border-transparent bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-300',
+  ok: 'border-transparent bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300',
+  warn: 'border-transparent bg-amber-50 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
+  err: 'border-transparent bg-red-50 text-red-600 dark:bg-red-400/15 dark:text-red-300',
   dim: 'border-transparent bg-surface text-muted-foreground',
-  accent: 'border-transparent bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-300',
+  accent: 'border-transparent bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300',
 }
 
 export function Badge(props: { children: JSX.Element; tone?: 'ok' | 'warn' | 'err' | 'dim' | 'accent'; class?: string }) {
   return (
     <span
-      class={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${BADGE[props.tone ?? 'dim'] ?? BADGE.dim} ${props.class ?? ''}`}
+      class={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-3 py-0.5 text-[11.5px] font-medium ${BADGE[props.tone ?? 'dim'] ?? BADGE.dim} ${props.class ?? ''}`}
     >
       {props.children}
     </span>
@@ -249,21 +243,28 @@ export function Badge(props: { children: JSX.Element; tone?: 'ok' | 'warn' | 'er
 }
 
 export function Empty(props: { text: string }) {
-  return <div class="px-4 py-9 text-center text-[13px] text-muted-foreground-2">{props.text}</div>
+  return (
+    <div class="flex flex-col items-center justify-center gap-2.5 px-6 py-14 text-center">
+      <span class="px-blob-sm grid h-12 w-12 place-items-center border border-dashed border-line-4 text-muted-foreground-2">
+        <Icon name="layers" size={20} />
+      </span>
+      <span class="text-[13px] text-muted-foreground-2">{props.text}</span>
+    </div>
+  )
 }
 
 export function SkeletonRows(props: { rows?: number }) {
   const widths = [42, 58, 34, 66, 50]
   const widths2 = [74, 88, 62, 80, 70]
   return (
-    <div class="px-5">
+    <div class="flex flex-col gap-3.5 px-6 py-5">
       <For each={Array.from({ length: props.rows ?? 4 })}>
         {(_, i) => {
           const n = i()
           return (
-            <div class="flex items-center gap-5 border-b border-border py-3.5 last:border-b-0">
-              <span class="px-skeleton" style={{ width: `${widths[n % widths.length]}%`, height: '14px' }} />
-              <span class="px-skeleton" style={{ width: `${widths2[n % widths2.length]}%`, height: '14px' }} />
+            <div class="flex items-center gap-5">
+              <span class="px-skeleton" style={{ width: `${widths[n % widths.length]}%`, height: '15px' }} />
+              <span class="px-skeleton" style={{ width: `${widths2[n % widths2.length]}%`, height: '15px' }} />
             </div>
           )
         }}
@@ -350,21 +351,21 @@ export function Select(props: {
     <div class="relative w-full" ref={root}>
       <button
         type="button"
-        class={`flex h-9 w-full items-center justify-between gap-2 rounded-lg border bg-background px-3 text-left text-[13px] text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500/40 ${open() ? 'border-primary-600' : 'border-line-3 hover:border-line-4'}`}
+        class={`flex h-9.5 w-full cursor-pointer items-center justify-between gap-2 rounded-full border bg-field px-4 text-left text-[13px] text-muted-foreground outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary-500/40 ${open() ? 'border-primary-600' : 'border-line-3 hover:border-line-4'}`}
         onClick={() => setOpen(!open())}
       >
         <span class="truncate">{props.value ?? props.placeholder ?? '请选择'}</span>
-        <Icon name="chevron" size={14} />
+        <Icon name="chevron" size={14} class="shrink-0" />
       </button>
       <Show when={open()}>
-        <div class="px-pop absolute left-0 right-0 top-[calc(100%+4px)] z-[60] overflow-hidden rounded-lg border border-line-3 bg-dropdown shadow-lg">
+        <div class="px-pop absolute left-0 right-0 top-[calc(100%+6px)] z-[60] overflow-hidden border border-line-3 bg-dropdown shadow-md" style={{ 'border-radius': '1.15rem 1.35rem 1rem 1.45rem' }}>
           <div class="max-h-60 overflow-y-auto p-1.5">
             <For each={props.options}>
               {(opt) => (
                 <button
                   type="button"
-                  class={`flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 font-mono text-xs text-foreground transition-colors duration-100 ${
-                    props.value === opt ? 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-300' : 'hover:bg-muted-hover'
+                  class={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-foreground transition-colors duration-300 ${
+                    props.value === opt ? 'bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300' : 'hover:bg-muted-hover'
                   }`}
                   onClick={() => pick(opt)}
                 >
@@ -411,26 +412,26 @@ export function MultiSelect(props: {
     <div class="relative w-full" ref={root}>
       <button
         type="button"
-        class={`flex h-9 w-full items-center justify-between gap-2 rounded-lg border bg-background px-3 text-left text-[13px] text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500/40 ${open() ? 'border-primary-600' : 'border-line-3 hover:border-line-4'}`}
+        class={`flex h-9.5 w-full cursor-pointer items-center justify-between gap-2 rounded-full border bg-field px-4 text-left text-[13px] text-muted-foreground outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary-500/40 ${open() ? 'border-primary-600' : 'border-line-3 hover:border-line-4'}`}
         onClick={() => setOpen(!open())}
       >
         <span class="truncate">{label()}</span>
-        <Icon name="chevron" size={14} />
+        <Icon name="chevron" size={14} class="shrink-0" />
       </button>
       <Show when={open()}>
-        <div class="px-pop absolute left-0 right-0 top-[calc(100%+4px)] z-[60] overflow-hidden rounded-lg border border-line-3 bg-dropdown shadow-lg">
-          <div class="flex justify-end gap-3 border-b border-card-divider bg-dropdown-header px-3 py-1.5">
-            <button class="text-xs text-primary-600 hover:underline dark:text-primary-400" onClick={() => props.onChange([])}>
+        <div class="px-pop absolute left-0 right-0 top-[calc(100%+6px)] z-[60] overflow-hidden border border-line-3 bg-dropdown shadow-md" style={{ 'border-radius': '1.15rem 1.35rem 1rem 1.45rem' }}>
+          <div class="flex justify-end gap-3 border-b border-card-divider bg-dropdown-header px-4 py-2">
+            <button class="cursor-pointer text-xs text-primary-600 hover:underline dark:text-primary-400" onClick={() => props.onChange([])}>
               清空
             </button>
-            <button class="text-xs text-primary-600 hover:underline dark:text-primary-400" onClick={() => props.onChange([...props.options])}>
+            <button class="cursor-pointer text-xs text-primary-600 hover:underline dark:text-primary-400" onClick={() => props.onChange([...props.options])}>
               全选
             </button>
           </div>
           <div class="max-h-60 overflow-y-auto p-1.5">
             <For each={props.options}>
               {(opt) => (
-                <label class={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 transition-colors duration-100 ${props.values.includes(opt) ? 'bg-primary-50 dark:bg-primary-400/10' : 'hover:bg-muted-hover'}`}>
+                <label class={`flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-300 ${props.values.includes(opt) ? 'bg-primary-50 dark:bg-primary-400/10' : 'hover:bg-muted-hover'}`}>
                   <input
                     type="checkbox"
                     class="h-3.5 w-3.5 accent-[var(--primary-600)]"

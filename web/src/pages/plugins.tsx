@@ -16,22 +16,19 @@ function PluginList() {
   const [plugins] = createResource(() => api<ManagedPlugin[]>('/api/plugins'))
   return (
     <div class="px-rise">
-      <div class="mb-5">
-        <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">插件</h2>
-        <p class="mt-1 text-[13px] text-muted-foreground-2">每个插件拥有独立的配置空间，包括插件设置、指令和访问控制</p>
-      </div>
+      <h2 class="mb-6 font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">插件</h2>
       <Show when={plugins()} fallback={<SkeletonRows rows={6} />}>
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <For each={plugins()}>
             {(p, i) => (
               <button
-                class="px-rise group flex flex-col gap-2.5 rounded-xl border border-line-2 bg-card p-5 text-left shadow-sm transition-all duration-200 outline-none hover:-translate-y-0.5 hover:border-primary-500/50 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary-500/40"
-                style={{ 'animation-delay': `${i() * 30}ms` }}
+                class="px-rise px-blob group flex flex-col gap-3 border border-line-2 bg-card p-6 text-left shadow-sm transition-all duration-500 outline-none hover:translate-y-0.5 hover:border-primary-500/40 hover:bg-muted-hover hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                style={{ 'animation-delay': `${i() * 40}ms` }}
                 onClick={() => navigate('plugins/' + encodeURIComponent(p.id))}
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <h3 class="truncate text-[15.5px] font-semibold text-foreground transition-colors duration-150 group-hover:text-primary-700 dark:group-hover:text-primary-300">
+                    <h3 class="font-display truncate text-[16px] font-semibold leading-snug text-foreground transition-colors duration-300 group-hover:text-primary-700 dark:group-hover:text-primary-300">
                       {p.name}
                     </h3>
                     <span class="font-mono text-xs text-primary-600 dark:text-primary-400">{p.id}</span>
@@ -39,7 +36,7 @@ function PluginList() {
                   <span class="font-mono text-xs text-muted-foreground-2">{String(i() + 1).padStart(2, '0')}</span>
                 </div>
                 <p class="flex-1 text-[13px] leading-relaxed text-muted-foreground">{p.description || '暂无插件说明'}</p>
-                <div class="flex flex-wrap gap-1.5">
+                <div class="flex flex-wrap gap-2">
                   <Badge tone="accent">{p.fields.length} 项设置</Badge>
                   <Badge>{p.commands.length} 条指令</Badge>
                   <Badge tone={p.access.default.mode === 'off' ? 'dim' : 'ok'}>
@@ -107,11 +104,10 @@ function PluginDetail(props: { id: string }) {
     <Show when={data()} keyed fallback={<SkeletonRows rows={8} />}>
       {(p) => (
         <div class="px-rise">
-          <div class="mb-5 flex items-start justify-between gap-4">
+          <div class="mb-6 flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-xl font-semibold tracking-[-0.015em] text-foreground">{p.name}</h2>
+              <h2 class="font-display text-[26px] font-semibold leading-tight tracking-tight text-foreground">{p.name}</h2>
               <p class="mt-1 font-mono text-xs text-muted-foreground-2">{p.id}</p>
-              <p class="mt-1 text-[13px] text-muted-foreground">{p.description || '暂无插件说明'}</p>
             </div>
             <button class="text-[13px] text-primary-600 hover:underline dark:text-primary-400" onClick={() => navigate('plugins')}>
               ← 返回插件目录
@@ -163,7 +159,7 @@ function PluginInput(props: { field: PluginField; value: unknown; onChange: (v: 
   if (props.field.type === 'password') {
     return (
       <input
-        class="h-9 w-full max-w-[480px] rounded-lg border border-line-3 bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+        class="h-10 w-full max-w-[480px] rounded-full border border-line-3 bg-field px-5 text-[13px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
         type="password"
         placeholder={props.value ? '已配置，留空则保留' : (props.field.placeholder || '')}
         autocomplete="new-password"
@@ -173,7 +169,7 @@ function PluginInput(props: { field: PluginField; value: unknown; onChange: (v: 
   }
   return (
     <input
-      class="h-9 w-full max-w-[480px] rounded-lg border border-line-3 bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+      class="h-10 w-full max-w-[480px] rounded-full border border-line-3 bg-field px-5 text-[13px] text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
       type={props.field.type === 'number' ? 'number' : 'text'}
       placeholder={props.field.placeholder || ''}
       value={String(props.value ?? '')}
@@ -192,16 +188,16 @@ function RuleEditor(props: {
   const lines = (arr: string[]) => (arr ?? []).join('\n')
   const parse = (v: string) => v.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean)
   const fieldCls =
-    'min-h-[76px] w-full rounded-lg border border-line-3 bg-background px-3 py-2 font-mono text-xs text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30'
+    'min-h-[76px] w-full rounded-[1.4rem] border border-line-3 bg-field px-4 py-2.5 font-mono text-xs leading-relaxed text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground-2 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30'
   return (
-    <div class="border-b border-card-divider px-5 py-4 last:border-b-0">
+    <div class="border-b border-card-divider px-6 py-5 last:border-b-0">
       <div class="mb-3 flex items-center justify-between gap-3.5">
         <div class="min-w-0">
           <b class="block text-[14px] font-semibold text-foreground">{props.title}</b>
           <span class="ml-1 text-xs text-muted-foreground-2">{props.hint}</span>
         </div>
         <select
-          class="h-9 min-w-[130px] rounded-lg border border-line-3 bg-card px-2.5 text-[12.5px] text-foreground outline-none transition-colors duration-150 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
+          class="h-9 min-w-[130px] rounded-full border border-line-3 bg-field px-3.5 text-[12.5px] text-foreground outline-none transition-colors duration-300 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
           value={props.rule.mode}
           onChange={(e) => props.onChange({ mode: e.currentTarget.value as AccessRule['mode'] })}
         >

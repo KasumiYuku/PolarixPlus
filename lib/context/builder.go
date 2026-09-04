@@ -163,9 +163,11 @@ func (b *MsgBuilder) plan() []Sender {
 				r := imgSlots[next]
 				next++
 				if r.err == nil && r.frag != "" {
+					// 图片独占一行，行后留空行分段：
+					// 后续引用等行首语法在新段落生效，不与图片粘连。
 					inline.WriteByte('\n')
-					inline.WriteString(r.frag)
-					inline.WriteByte('\n')
+					inline.WriteString(strings.TrimRight(r.frag, "\n"))
+					inline.WriteString("\n\n")
 					continue
 				}
 				// 图床失败降级：强制直接走 QQ 媒体，不再重试 Fragment

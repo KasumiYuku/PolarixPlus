@@ -9,16 +9,11 @@
     "GROUP_MESSAGE_CREATE",
     "C2C_MESSAGE_CREATE",
     "INTERACTION_CREATE",
-    "GROUP_JOIN_REQUEST",
     "GROUP_MEMBER_ADD",
     "GROUP_MEMBER_REMOVE",
     "MESSAGE_AUDIT_PASS",
-    "MESSAGE_AUDIT_REJECT",
-    "GROUP_ADD_ROBOT",
-    "GROUP_DEL_ROBOT"
+    "MESSAGE_AUDIT_REJECT"
   ],
-  "uin": 0,
-  "uid": "",
   "database": "bot.db",
   "admin_password": "设置一个管理面板密码",
   "global_markdown": false,

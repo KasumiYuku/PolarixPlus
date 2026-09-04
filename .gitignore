@@ -7,4 +7,5 @@ lib/assets/providers/
 *.db-wal
 web/node_modules/
 polarix
+Plrx
 lib/admin/dist/
