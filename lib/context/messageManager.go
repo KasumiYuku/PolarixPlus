@@ -7,6 +7,11 @@ import (
 	"Plrx/lib/templates"
 )
 
+// Sender 可发送的消息对象（Text/Markdown/Media 均实现）。
+type Sender interface {
+	Send() error
+}
+
 type MessageManager struct {
 	MessageId string
 	EventId   string
@@ -37,35 +42,39 @@ func (manager *MessageManager) baseStruct() *message.Message {
 	return msg
 }
 
-// 生成纯文本回复消息
+// Text 生成纯文本回复消息；全局 markdown 开启时自动转 markdown。
 func (manager *MessageManager) Text(content string) *message.TextMessage {
 	metamsg := manager.baseStruct()
 	msg := message.TextMessage{
 		Message: metamsg,
 	}
-	// 填充内容
 	msg.Type = constant.PlainText
 	msg.Content(content)
 	msg.Init()
+	if manager.Qapi != nil && manager.Qapi.GlobalMarkdown {
+		msg.MarkdownMode = true
+	}
 	return &msg
 }
 
-// 生成Markdown回复消息
+// Markdown 生成 Markdown 回复消息。
 func (manager *MessageManager) Markdown(content string) *message.MarkdownMessage {
 	metamsg := manager.baseStruct()
 	msg := message.MarkdownMessage{
 		Message: metamsg,
 	}
 	msg.Init()
-	// 填充内容
 	msg.Type = constant.Markdown
 	msg.Markdown = templates.Markdown{
 		Content: content,
 	}
+	if manager.Qapi != nil {
+		msg.SetAssets(manager.Qapi.Assets)
+	}
 	return &msg
 }
 
-// Media creates a rich-media message from file_info returned by QQ's upload API.
+// Media 构造已上传媒体消息（file_info 来自 QQ 上传接口）。
 func (manager *MessageManager) Media(fileInfo string) *message.MediaMessage {
 	msg := &message.MediaMessage{
 		Message: manager.baseStruct(),
@@ -78,26 +87,82 @@ func (manager *MessageManager) Media(fileInfo string) *message.MediaMessage {
 	return msg
 }
 
-// 填充Markdown模板并构造Markdown消息
+// At 构造艾特部件。
+func (manager *MessageManager) At(openid string) *message.AtMessage {
+	msg := &message.AtMessage{
+		Message: manager.baseStruct(),
+		OpenID:  openid,
+	}
+	msg.Type = constant.PlainText
+	return msg
+}
+
+// AtAll 构造 @所有人 部件。
+func (manager *MessageManager) AtAll() *message.AtMessage {
+	msg := &message.AtMessage{
+		Message: manager.baseStruct(),
+		All:     true,
+	}
+	msg.Type = constant.PlainText
+	return msg
+}
+
+// Image 构造图片部件；src 支持 string(路径/data/base64/公网URL) 与 []byte。
+// size 可选：传 2 个值 (宽,高) 时作为显式尺寸标注；不传则按图床探测/URL 探测自动补齐。
+// 发送形态（markdown 内嵌 / 独立媒体）由 Send 时按上下文决策。
+func (manager *MessageManager) Image(src any, summary string, size ...int) *message.ImageMessage {
+	msg := &message.ImageMessage{
+		Message: manager.baseStruct(),
+		Src:     src,
+		Summary: summary,
+	}
+	if len(size) >= 2 {
+		msg.Width, msg.Height = size[0], size[1]
+	}
+	return msg
+}
+
+// Voice 构造语音部件；src 支持路径/URL/data/base64/[]byte。
+func (manager *MessageManager) Voice(src any) *message.UploadMessage {
+	return manager.upload(constant.MediaVoice, src, "voice")
+}
+
+// Video 构造视频部件。
+func (manager *MessageManager) Video(src any) *message.UploadMessage {
+	return manager.upload(constant.MediaVideo, src, "video")
+}
+
+// File 构造文件部件。
+func (manager *MessageManager) File(src any, name string) *message.UploadMessage {
+	return manager.upload(constant.MediaFile, src, name)
+}
+
+func (manager *MessageManager) upload(fileType int, src any, name string) *message.UploadMessage {
+	msg := &message.UploadMessage{
+		Message:  manager.baseStruct(),
+		FileType: fileType,
+		Src:      src,
+		Name:     name,
+	}
+	return msg
+}
+
+// MarkdownTemplate 填充 Markdown 模板并构造消息。
 func (manager *MessageManager) MarkdownTemplate(id string, args *templates.Args) (*message.MarkdownMessage, error) {
 	var content string
 	var err error
 	if args == nil {
-		// args = &templates.Args{}
 		content, err = templates.FillMarkdownTemplate(id, templates.Args{})
 	} else {
 		content, err = templates.FillMarkdownTemplate(id, *args)
-
 	}
-	// 填充Markdown模板
 	if err != nil {
 		return nil, err
 	}
-	// 构造消息
 	return manager.Markdown(content), nil
 }
 
-// 填充Markdown模板时出错会panic
+// UnsafeMarkdownTemplate 填充失败时 panic。
 func (manager *MessageManager) UnsafeMarkdownTemplate(id string, args *templates.Args) *message.MarkdownMessage {
 	content, err := templates.FillMarkdownTemplate(id, *args)
 	if err != nil {

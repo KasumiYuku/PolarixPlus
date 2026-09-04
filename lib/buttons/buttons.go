@@ -62,7 +62,7 @@ func (k *Keyboard) Marshal() ([]byte, error) {
 
 func (k *Keyboard) AppendButton(id string, label string, visited string, style ButtonStyle, row int) (*Button, error) {
 	if row > 4 || row < 0 {
-		return nil, fmt.Errorf("Row must between 0 and 5, but received %v", row)
+		return nil, fmt.Errorf("行号需在 0~4 之间，收到 %d", row)
 	}
 	button := Button{
 		RenderData: RenderData{

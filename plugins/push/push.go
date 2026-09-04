@@ -3,19 +3,23 @@ package push
 import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
+	"Plrx/lib/logx"
 	"Plrx/lib/plugin"
 	"Plrx/lib/qqapi"
 	"Plrx/lib/storage"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+var logger = logx.New("push")
 
 const (
 	pluginID = "push"
@@ -24,10 +28,33 @@ const (
 	storeKeyEnabled = "enabled"
 )
 
+// 暴力枚举防护：全局滑动窗口限速，防止无 key 时无限试错。
+const (
+	rateLimitWindow = time.Minute
+	rateLimitMax    = 20
+)
+
 var (
 	clientMu sync.RWMutex
 	client   *qqapi.Client
+
+	rateMu    sync.Mutex
+	rateCount int
+	rateStart time.Time
 )
+
+// pushRateLimited 判断当前是否触发限流；通过则计一次并返回 false。
+func pushRateLimited() bool {
+	rateMu.Lock()
+	defer rateMu.Unlock()
+	now := time.Now()
+	if rateStart.IsZero() || now.Sub(rateStart) > rateLimitWindow {
+		rateStart = now
+		rateCount = 0
+	}
+	rateCount++
+	return rateCount > rateLimitMax
+}
 
 func SetClient(c *qqapi.Client) {
 	clientMu.Lock()
@@ -182,6 +209,11 @@ func HTTPHandle(c *gin.Context) {
 		key = req.Key
 	}
 	if !verifyPushKey(openid, key) {
+		// 触发限速时统一 429，拒绝后续暴力尝试
+		if pushRateLimited() {
+			c.JSON(http.StatusTooManyRequests, pushResponse{Error: "too many failed attempts"})
+			return
+		}
 		c.JSON(http.StatusUnauthorized, pushResponse{Error: "invalid or missing push key"})
 		return
 	}
@@ -215,7 +247,7 @@ func HTTPHandle(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[push] external push to %s/%s (%d bytes)", scope, openid, len(payload))
+	logger.Infof("external push to %s/%s (%d bytes)", scope, openid, len(payload))
 	var sendErr error
 	if scope == "group" {
 		sendErr = api.SendGroupMessage(payload, openid)
@@ -238,7 +270,8 @@ func verifyPushKey(openid string, provided string) bool {
 	if err != nil || !found {
 		return false
 	}
-	return stored == provided
+	// 常量时间比较，防 key 长度/内容侧信道被逐字节枚举
+	return subtle.ConstantTimeCompare([]byte(stored), []byte(provided)) == 1
 }
 
 func buildPayload(kind, content string) ([]byte, error) {

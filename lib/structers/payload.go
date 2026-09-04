@@ -25,6 +25,8 @@ type PrasedData struct {
 	GroupOpenID  string               `json:"group_openid"`
 	MemberOpenId string               `json:"member_openid"` // 入群验证时传递的member_id
 	Attachments  []message.Attachment `json:"attachments"`
+	Mentions     []Mention            `json:"mentions,omitempty"`
+	MsgElements  []MsgElement         `json:"msg_elements,omitempty"`
 	Author       struct {
 		ID           string                `json:"id"`
 		UserOpenID   string                `json:"user_openid"`
@@ -34,16 +36,17 @@ type PrasedData struct {
 		Username     string                `json:"username"`
 		Bot          bool                  `json:"bot"`
 	} `json:"author"`
-	// 用于 Op=13 时的网络探测数据结构
+	// Op=13 网络探测数据
 	PlainToken string `json:"plain_token"`
 	EventTs    string `json:"event_ts"`
-	// 回调按钮
-	Scene    string `json:"scene"`
-	Callback struct {
+	Scene      string `json:"scene"`
+	Callback   struct {
 		Resolved CallbackData `json:"resolved"`
 	} `json:"data"`
 	JoinRequestId string         `json:"join_request_id"`
 	VerifyInfo    VerifyInfoData `json:"verify_info"`
+	AuditID       string         `json:"audit_id"`
+	MessageId     string         `json:"message_id"`
 }
 
 type VerifyInfoData struct {

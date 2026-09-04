@@ -1,117 +1,164 @@
+// Package admin 管理台: 鉴权、JSON API 与 SPA 静态托管。
 package admin
 
 import (
+	"Plrx/lib/assets"
 	"Plrx/lib/config"
-	"Plrx/lib/plugin"
-	"crypto/subtle"
-	_ "embed"
+	"Plrx/lib/qqapi"
+	"embed"
+	"io/fs"
 	"net"
 	"net/http"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed panel.html
-var panelPage []byte
+//go:embed dist
+var distFS embed.FS
 
-//go:embed plugin.html
-var pluginPage []byte
-
-func Register(router *gin.Engine, password string) {
-	admin := router.Group("/admin")
-	admin.Use(access(password))
-	admin.GET("", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", panelPage)
-	})
-	admin.GET("/plugins/:id", func(c *gin.Context) {
-		if _, ok := plugin.ManagedPluginByID(c.Param("id")); !ok {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", pluginPage)
-	})
-	admin.GET("/api/plugins", func(c *gin.Context) {
-		c.JSON(http.StatusOK, plugin.ManagedPlugins())
-	})
-	admin.GET("/api/plugins/:id", func(c *gin.Context) {
-		managed, ok := plugin.ManagedPluginByID(c.Param("id"))
-		if !ok {
-			c.JSON(http.StatusNotFound, gin.H{"error": "插件不存在"})
-			return
-		}
-		c.JSON(http.StatusOK, managed)
-	})
-	admin.PUT("/api/plugins/:id", func(c *gin.Context) {
-		var input map[string]any
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式无效"})
-			return
-		}
-		prepared, err := plugin.PrepareConfiguration(c.Param("id"), input)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if err := config.SavePluginSettings(c.Param("id"), prepared); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败"})
-			return
-		}
-		if err := plugin.ApplyConfiguration(c.Param("id"), prepared); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
-	admin.PUT("/api/plugins/:id/access", func(c *gin.Context) {
-		var input plugin.AccessConfig
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式无效"})
-			return
-		}
-		prepared, err := plugin.PrepareAccessConfiguration(c.Param("id"), input)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		persisted := config.AccessConfig{
-			Default:  toConfigAccessRule(prepared.Default),
-			Commands: make(map[string]config.AccessRule, len(prepared.Commands)),
-		}
-		for path, rule := range prepared.Commands {
-			persisted.Commands[path] = toConfigAccessRule(rule)
-		}
-		if err := config.SavePluginAccess(c.Param("id"), persisted); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "保存访问控制失败"})
-			return
-		}
-		plugin.ApplyAccessConfiguration(c.Param("id"), prepared)
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
+// Deps 管理台依赖。
+type Deps struct {
+	Assets  *assets.Manager // 可为 nil, 为 nil 时图床接口不可用
+	Client  *qqapi.Client   // 热更消息选项用
+	Gateway func() any      // websocket 模式的网关状态; webhook 传 nil
+	Control Control
 }
 
-func toConfigAccessRule(rule plugin.AccessRule) config.AccessRule {
-	return config.AccessRule{Mode: rule.Mode, Users: rule.Users, Groups: rule.Groups}
+// Control 运行控制回调, 由 main 注入。
+type Control struct {
+	Restart func()
+	Stop    func()
 }
 
-func access(password string) gin.HandlerFunc {
+// Register 挂载全部 /admin 路由。
+func Register(engine *gin.Engine, deps Deps) {
+	sess := newSessions()
+	bus := newLiveBus(deps)
+	admin := engine.Group("/admin")
+
+	admin.POST("/api/login", handleLogin(sess))
+	admin.POST("/api/logout", handleLogout(sess))
+
+	api := admin.Group("/api")
+	api.Use(requireAuth(sess))
+	{
+		api.GET("/me", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true, "admin": true}) })
+		api.GET("/overview", handleOverview(deps))
+		api.GET("/stream", bus.handleStream)
+		api.GET("/logs", handleLogs)
+		registerPluginRoutes(api)
+		if deps.Assets != nil {
+			registerAssetsRoutes(api, deps.Assets)
+		}
+		api.GET("/jobs", handleJobs)
+		api.POST("/jobs/:id/pause", handleJobPause)
+		api.GET("/config", handleGetConfig)
+		api.PUT("/config", handlePutConfig(deps))
+		api.POST("/system/restart", func(c *gin.Context) { triggerControl(c, deps.Control.Restart, "重启") })
+		api.POST("/system/stop", func(c *gin.Context) { triggerControl(c, deps.Control.Stop, "停止") })
+	}
+
+	// SPA 壳对未鉴权开放, 数据接口受保护; 未匹配路径(含前端路由与静态资源)一律走 NoRoute
+	engine.NoRoute(serveSPA)
+}
+
+// requireAuth 会话校验: 未设密码时仅回环地址放行, 有密码时校验会话 Cookie。
+func requireAuth(sess *sessions) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if password == "" {
-			host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-			if err == nil && net.ParseIP(host).IsLoopback() {
+		cfg := config.Current()
+		if cfg.AdminPassword == "" {
+			if isLoopback(c.Request.RemoteAddr) {
 				c.Next()
 				return
 			}
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "远程管理未启用，请在 config.json 中设置 admin_password"})
 			return
 		}
-		username, provided, ok := c.Request.BasicAuth()
-		validUser := subtle.ConstantTimeCompare([]byte(username), []byte("admin")) == 1
-		validPassword := subtle.ConstantTimeCompare([]byte(provided), []byte(password)) == 1
-		if !ok || !validUser || !validPassword {
-			c.Header("WWW-Authenticate", `Basic realm="Bot admin", charset="UTF-8"`)
-			c.AbortWithStatus(http.StatusUnauthorized)
+		token, err := c.Cookie(sessionCookie)
+		if err != nil || !sess.valid(token, cfg.AdminPassword) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "未登录或会话已失效"})
 			return
 		}
 		c.Next()
 	}
+}
+
+// triggerControl 触发运行控制, 延迟 300ms 让响应先发出。
+func triggerControl(c *gin.Context, action func(), name string) {
+	if action == nil {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": name + "控制未启用"})
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"ok": true, "notice": name + "已触发"})
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		action()
+	}()
+}
+
+// serveSPA 托管构建产物; 非 API 未知路径回退 index.html 支持前端路由。
+func serveSPA(c *gin.Context) {
+	if c.Request.Method != http.MethodGet {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	rel := strings.TrimPrefix(c.Request.URL.Path, "/admin")
+	if !strings.HasPrefix(c.Request.URL.Path, "/admin") {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if rel == "" {
+		rel = "/"
+	}
+	if strings.HasPrefix(rel, "/api/") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "接口不存在"})
+		return
+	}
+
+	name := strings.TrimPrefix(rel, "/")
+	if name == "" {
+		name = "index.html"
+	}
+	fsys, err := fs.Sub(distFS, "dist")
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if name != "index.html" {
+		if f, err := fsys.Open(name); err == nil {
+			info, statErr := f.Stat()
+			f.Close()
+			if statErr == nil && !info.IsDir() {
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+				http.ServeFileFS(c.Writer, c.Request, fsys, name)
+				return
+			}
+		}
+		if filepath.Ext(name) != "" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+	}
+
+	index, err := fs.ReadFile(fsys, "index.html")
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", index)
+}
+
+// isLoopback 判断请求是否来自回环地址。
+func isLoopback(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

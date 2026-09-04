@@ -3,18 +3,20 @@ package imagegen
 import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
+	"Plrx/lib/logx"
 	"Plrx/lib/message"
 	"Plrx/lib/plugin"
 	"Plrx/lib/requests"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
+
+var logger = logx.New("imagegen")
 
 type Config struct {
 	Enabled bool   `json:"enabled"`
@@ -151,7 +153,7 @@ func draw(ctx *context.MessageContext) error {
 		_ = ctx.Text("图片接口未返回可发送的 URL，请将接口配置为 URL 输出。").Send()
 		return fmt.Errorf("image generation response contains no url (base64 returned: %t)", image.B64JSON != "")
 	}
-	log.Printf("[imagegen] generated image URL: %s", image.URL)
+	logger.Infof("generated image URL: %s", image.URL)
 	filePath, err := downloadImage(image.URL)
 	if err != nil {
 		_ = ctx.Text("图片下载失败，请稍后重试。").Send()

@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -16,77 +20,193 @@ type Client struct {
 
 func Init(timeout int) *Client {
 	return &Client{
-		client: http.Client{
-			Timeout: time.Duration(timeout) * time.Second,
-		},
+		client:     http.Client{Timeout: time.Duration(timeout) * time.Second},
 		maxRetries: 3,
 	}
 }
 
-func (c *Client) Get(url string, result any, headers map[string]string) error {
-	return c.request(http.MethodGet, url, nil, result, headers)
-}
-
-func (c *Client) Post(url string, body any, result any, headers map[string]string) error {
-	return c.request(http.MethodPost, url, body, result, headers)
-}
-
-func (c *Client) Put(url string, body any, result any, headers map[string]string) error {
-	return c.request(http.MethodPut, url, body, result, headers)
-}
-
-func (c *Client) Patch(url string, body any, result any, headers map[string]string) error {
-	return c.request(http.MethodPatch, url, body, result, headers)
-}
-
-func (c *Client) Delete(url string, body any, result any, headers map[string]string) error {
-	return c.request(http.MethodDelete, url, body, result, headers)
-}
-
-func (c *Client) Head(url string, headers map[string]string) error {
-	return c.request(http.MethodHead, url, nil, nil, headers)
-}
-
-func (c *Client) request(method, url string, body any, result any, headers map[string]string) error {
-	bodyReader, err := encodeBody(body)
+// Do 通用请求，body 由 Body 接口拼装，响应 JSON 解码到 result。
+func (c *Client) Do(method, rawURL string, body Body, result any, headers map[string]string) error {
+	raw, err := c.DoBytes(method, rawURL, body, headers)
 	if err != nil {
 		return err
 	}
+	if result == nil || len(raw) == 0 {
+		return nil
+	}
+	return json.Unmarshal(raw, result)
+}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+// DoBytes 返回原始字节，由调用方自行解析。
+func (c *Client) DoBytes(method, rawURL string, body Body, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequest(method, rawURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create %s request: %w", method, err)
+		return nil, fmt.Errorf("failed to create %s request: %w", method, err)
 	}
-
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	return c.do(req, result)
-}
-
-func encodeBody(body any) (io.Reader, error) {
-	switch v := body.(type) {
-	case nil:
-		return nil, nil
-	case []byte:
-		return bytes.NewReader(v), nil
-	case string:
-		return bytes.NewReader([]byte(v)), nil
-	case io.Reader:
-		return v, nil
-	default:
-		jsonBytes, err := json.Marshal(v)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		r, ct := body.Reader()
+		req.Body = io.NopCloser(r)
+		req.ContentLength = body.Size()
+		if ct != "" {
+			req.Header.Set("Content-Type", ct)
 		}
-		return bytes.NewReader(jsonBytes), nil
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	return c.do(req)
+}
+
+func (c *Client) Get(url string, result any, headers map[string]string) error {
+	return c.Do(http.MethodGet, url, nil, result, headers)
+}
+
+func (c *Client) Post(url string, body any, result any, headers map[string]string) error {
+	return c.Do(http.MethodPost, url, JSON(body), result, headers)
+}
+
+func (c *Client) PostForm(url string, form url.Values, result any, headers map[string]string) error {
+	return c.Do(http.MethodPost, url, Form(form), result, headers)
+}
+
+func (c *Client) PostMultipart(url string, mp *Multipart, result any, headers map[string]string) error {
+	return c.Do(http.MethodPost, url, mp, result, headers)
+}
+
+func (c *Client) Put(url string, body any, result any, headers map[string]string) error {
+	return c.Do(http.MethodPut, url, ByteBody(body), result, headers)
+}
+
+func (c *Client) Patch(url string, body any, result any, headers map[string]string) error {
+	return c.Do(http.MethodPatch, url, JSON(body), result, headers)
+}
+
+func (c *Client) Delete(url string, body any, result any, headers map[string]string) error {
+	return c.Do(http.MethodDelete, url, JSON(body), result, headers)
+}
+
+// --- Body 抽象 ---
+
+// Body 可重读请求体，内部预缓冲，支持重试。
+type Body interface {
+	Reader() (io.Reader, string) // 返回 body 与 Content-Type
+	Size() int64
+}
+
+type bytesBody struct{ data []byte }
+
+func Bytes(b []byte) Body { return bytesBody{data: b} }
+
+func (b bytesBody) Reader() (io.Reader, string) { return bytes.NewReader(b.data), "application/json" }
+func (b bytesBody) Size() int64                 { return int64(len(b.data)) }
+
+// JSON 构造 JSON body：[]byte/string 原样，其他 json.Marshal。
+func JSON(v any) Body {
+	switch b := v.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return Bytes(b)
+	case string:
+		return Bytes([]byte(b))
+	case io.Reader:
+		data, _ := io.ReadAll(b)
+		return bytesBody{data: data}
+	default:
+		data, err := json.Marshal(v)
+		if err != nil {
+			panic(fmt.Sprintf("requests.JSON: %v", err))
+		}
+		return bytesBody{data: data}
 	}
 }
+
+type formBody struct{ data []byte }
+
+func Form(v url.Values) Body {
+	return formBody{data: []byte(v.Encode())}
+}
+
+func (b formBody) Reader() (io.Reader, string) {
+	return bytes.NewReader(b.data), "application/x-www-form-urlencoded"
+}
+func (b formBody) Size() int64 { return int64(len(b.data)) }
+
+// ByteBody 将 any 转字节 body：[]byte 原样、string 转字节、其他 JSON 编码。
+func ByteBody(v any) Body {
+	switch b := v.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return bytesBody{data: b}
+	case string:
+		return bytesBody{data: []byte(b)}
+	default:
+		return JSON(v)
+	}
+}
+
+// Multipart 预构建 multipart/form-data 请求体。
+type Multipart struct {
+	buf  bytes.Buffer
+	ct   string
+	size int64
+}
+
+func NewMultipart() *Multipart { return &Multipart{} }
+
+// AddField 添加表单字段。
+func (mp *Multipart) AddField(key, value string) *Multipart {
+	if err := mp.writer().WriteField(key, value); err != nil {
+		panic(err)
+	}
+	return mp
+}
+
+// AddFile 添加文件字段。
+func (mp *Multipart) AddFile(field, name, mimeType string, data []byte) *Multipart {
+	mw := mp.writer()
+	var part io.Writer
+	if mimeType == "" {
+		var err error
+		part, err = mw.CreateFormFile(field, name)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition",
+			fmt.Sprintf(`form-data; name="%s"; filename="%s"`, field, path.Base(name)))
+		h.Set("Content-Type", mimeType)
+		var err error
+		part, err = mw.CreatePart(h)
+		if err != nil {
+			panic(err)
+		}
+	}
+	if _, err := part.Write(data); err != nil {
+		panic(err)
+	}
+	return mp
+}
+
+// Close 完成 multipart 构造，此后可作 Body 使用。
+func (mp *Multipart) Close() {
+	mw := mp.writer()
+	if err := mw.Close(); err != nil {
+		panic(err)
+	}
+	mp.ct = mw.FormDataContentType()
+	mp.size = int64(mp.buf.Len())
+}
+
+func (mp *Multipart) Reader() (io.Reader, string) {
+	return bytes.NewReader(mp.buf.Bytes()), mp.ct
+}
+
+func (mp *Multipart) Size() int64 { return mp.size }
+
+func (mp *Multipart) writer() *multipart.Writer { return multipart.NewWriter(&mp.buf) }
 
 func isRetryableStatus(code int) bool {
 	return code == http.StatusRequestTimeout ||
@@ -94,14 +214,14 @@ func isRetryableStatus(code int) bool {
 		code >= 500
 }
 
-func (c *Client) do(req *http.Request, result any) error {
+func (c *Client) do(req *http.Request) ([]byte, error) {
 	var bodyBytes []byte
 	if req.Body != nil {
 		var err error
 		bodyBytes, err = io.ReadAll(req.Body)
 		req.Body.Close()
 		if err != nil {
-			return fmt.Errorf("failed to read request body: %w", err)
+			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
 	}
 
@@ -152,16 +272,11 @@ func (c *Client) do(req *http.Request, result any) error {
 			if isRetryableStatus(resp.StatusCode) {
 				continue
 			}
-			return lastErr
+			return nil, lastErr
 		}
 
-		if result != nil && len(respBody) > 0 {
-			if err := json.Unmarshal(respBody, result); err != nil {
-				return fmt.Errorf("failed to decode response json: %w", err)
-			}
-		}
-		return nil
+		return respBody, nil
 	}
 
-	return lastErr
+	return nil, lastErr
 }

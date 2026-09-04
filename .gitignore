@@ -1,4 +1,10 @@
 config.json
+assets.json
+lib/assets/providers/
+*_test.go
 *.db
 *.db-shm
 *.db-wal
+web/node_modules/
+polarix
+lib/admin/dist/

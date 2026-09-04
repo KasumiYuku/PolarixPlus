@@ -17,7 +17,7 @@ type Context struct {
 	GroupStorage   *storage.Store
 }
 
-// 初始化Context对象及MessageManager对象
+// Init 初始化 Context 与 MessageManager。
 func (context *Context) Init(messageId, eventId string, qqapi *qqapi.Client) {
 	context.MessageManager = &MessageManager{
 		MessageId: messageId,

@@ -42,6 +42,13 @@ func init() {
 		DisablePrivate: true,
 	})
 
+	commands = append(commands, &plugin.Command{
+		Prefix:   "/showcase",
+		Role:     constant.RoleMember,
+		Describe: "消息构造器演示",
+		Handle:   showcase,
+	})
+
 	plugin.Register(&plugin.Plugin{
 		Id:       "echo",
 		Commands: commands,
@@ -66,7 +73,7 @@ func echoButtonCallback(context *context.CallbackContext) error {
 func randomImg(context *context.MessageContext) error {
 	type result struct {
 		Url    string `json:"url"`
-		Witdh  uint   `json:"width"`
+		Width  uint   `json:"width"`
 		Height uint   `json:"height"`
 	}
 	var re result
@@ -74,13 +81,14 @@ func randomImg(context *context.MessageContext) error {
 	if err != nil {
 		return err
 	}
-	msg := context.Markdown(fmt.Sprintf("![img #%v #%v](%v)\n> 图片源: [loliapi](https://www.loliapi.com/)\n> 图片直链:\n```\n%v\n```", re.Witdh, re.Height, re.Url, re.Url))
 	k := &buttons.Keyboard{}
 	btn, _ := k.AppendButton("1", "再来一张", "还要啊", buttons.Blue, 0)
 	btn.SetAutoCommand("/random", true, false).SetUnsupportedTip("不支持按钮捏").SetPermission(buttons.AllUser)
-	msg.Keyboard(k)
-	// context.Text(fmt.Sprintf("![img #%v #%v](%v)\n> 图片源: [loliapi](https://www.loliapi.com/)\n> Origin:\n```\n%v\n```", re.Witdh, re.Height, re.Url, re.Url)).Send()
-	return msg.Send()
+	return context.Msg().
+		Image(re.Url, "img", int(re.Width), int(re.Height)).
+		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n> 图片直链:\n```\n%v\n```", re.Url)).
+		Keyboard(k).
+		Send()
 }
 
 func getUid(context *context.MessageContext) error {
@@ -97,4 +105,26 @@ func getUid(context *context.MessageContext) error {
 func getGid(context *context.MessageContext) error {
 	md := context.Markdown(fmt.Sprintf("## 当前群ID\n```\n%v\n```", context.GroupId))
 	return md.Send()
+}
+
+// showcase 演示消息
+func showcase(ctx *context.MessageContext) error {
+	var re struct {
+		Url    string `json:"url"`
+		Width  uint   `json:"width"`
+		Height uint   `json:"height"`
+	}
+	if err := ctx.Request.Get("https://www.loliapi.com/bg/?type=json", &re, nil); err != nil {
+		return err
+	}
+	k := &buttons.Keyboard{}
+	btn, _ := k.AppendButton("1", "再来一张", "还要啊", buttons.Blue, 0)
+	btn.SetAutoCommand("/random", true, false).SetUnsupportedTip("不支持按钮捏").SetPermission(buttons.AllUser)
+	return ctx.Msg().
+		At(ctx.UserId).
+		Text(" 看这个").
+		Image(re.Url, "随机图").
+		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n```\n%v\n```", re.Url)).
+		Keyboard(k).
+		Send()
 }

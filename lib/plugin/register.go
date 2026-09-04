@@ -5,9 +5,9 @@ import (
 	"Plrx/lib/context"
 	"Plrx/lib/parser"
 	"Plrx/lib/utils"
+	"cmp"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -21,8 +21,6 @@ var commandCount uint = 0
 
 // 处理所有子指令的回调函数
 func subCommandHandle(command *Command, pluginId string) {
-	// lock.Lock()
-	// defer lock.Unlock()
 	// 处理解析器接口
 	if command.Parser == nil {
 		command.Parser = &parser.DefaultParser{}
@@ -53,7 +51,7 @@ func Register(plugin *Plugin) {
 		v := plugin.Commands[k] // 读取指针
 		v.PluginId = plugin.Id
 		if v.Parser == nil {
-			v.Parser = &parser.DefaultParser{} // 如果没有自定义解析器, 使用默认的解析器
+			v.Parser = &parser.DefaultParser{}
 		}
 		if v.Handle == nil {
 			v.Handle = defaultCommandHandle
@@ -162,7 +160,7 @@ func ConfiguredPlugins() []ConfiguredPlugin {
 		}
 		result = append(result, ConfiguredPlugin{ID: id, Name: name, Description: registered.Description, Fields: registered.Config, Values: values})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	slices.SortFunc(result, func(a, b ConfiguredPlugin) int { return cmp.Compare(a.ID, b.ID) })
 	return result
 }
 
@@ -189,10 +187,10 @@ func ManagedPlugins() []ManagedPlugin {
 		for _, command := range registered.Commands {
 			collectCommandPaths(command, command.Prefix, &commands)
 		}
-		sort.Strings(commands)
+		slices.Sort(commands)
 		result = append(result, ManagedPlugin{ConfiguredPlugin: base, Commands: commands, Access: cloneAccessConfig(pluginAccess[id])})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	slices.SortFunc(result, func(a, b ManagedPlugin) int { return cmp.Compare(a.ID, b.ID) })
 	return result
 }
 
@@ -333,7 +331,7 @@ func cleanIDs(values []string) []string {
 			result = append(result, value)
 		}
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }
 
@@ -425,6 +423,13 @@ func cloneSettings(source map[string]any) map[string]any {
 	return result
 }
 
+// RegisteredCount 已注册插件数 (含无配置项的)。
+func RegisteredCount() int {
+	lock.RLock()
+	defer lock.RUnlock()
+	return len(globalPlugins)
+}
+
 // 根据前缀获取Command指针
 func GetCommand(prefix string) (*Command, bool) {
 	lock.RLock()
@@ -435,7 +440,6 @@ func GetCommand(prefix string) (*Command, bool) {
 
 // 处理包含子指令的指令
 func subCommandHandleFunc(context *context.MessageContext) error {
-	// args := strings.Split(context.Raw, " ")
 	args := strings.Split(utils.FilterAt(context.Raw), " ") // 一定会有0号元素, 这里已经是传入的指令处理部分了
 	currentCmd, ok := GetCommand(args[0])                   // 获取父级指令对象
 	if !ok || currentCmd == nil {
