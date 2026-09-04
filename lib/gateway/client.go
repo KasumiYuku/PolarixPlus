@@ -29,12 +29,17 @@ const (
 	opInvalidSession = 9
 	opHello          = 10
 	opHeartbeatACK   = 11
+
+	maxBackoff = 30 * time.Second // 网络退避上限
+	writeWait  = 10 * time.Second // 写帧超时, 防止对端黑洞卡死
+	readWindow = 90 * time.Second // 读帧超时, 防止服务端静默
 )
 
-// 重连原因分类哨兵：作用域内根据类别决定是快速会话恢复还是限量等待后重新鉴权。
+// 决定退避节奏与会话去留
 var (
-	errInvalidSession = errors.New("会话失效，需重新鉴权")
 	errReconnect      = errors.New("服务端要求重连")
+	errInvalidSession = errors.New("会话失效, 需重新鉴权")
+	errStop           = errors.New("服务端禁止重连")
 )
 
 type frame struct {
@@ -52,16 +57,15 @@ type Client struct {
 	intents    int
 	shard      [2]int
 
-	mu        sync.Mutex
-	conn      *websocket.Conn
-	sessionID string
-	seq       int64
-	connAt    time.Time // 当前连接建立时刻, 供状态页展示
-	ackAt     time.Time // 最近一次心跳 ACK 时刻
+	backoff time.Duration // 新连接退避基数, 瞬时失败逐次翻倍
 
-	ping *time.Ticker
-	// acked 心跳护栏：上一次心跳未获 ACK 视为连接假死，主动断开触发重连。
-	acked bool
+	mu        sync.Mutex
+	cur       *conn     // 当前活动连接, 供 Stop 掐线
+	sessionID string    // 服务端会话, RESUME 依据
+	seq       int64     // 最近确认序号
+	connAt    time.Time // 当前连接建立时刻, 状态页展示
+	ackAt     time.Time // 最近心跳 ACK 时刻, 状态页展示
+	online    bool      // READY/RESUMED 之后为真
 
 	stopOnce sync.Once
 	stop     chan struct{}
@@ -78,18 +82,18 @@ func New(api *qqapi.Client, gatewayURL string, intents int, shard [2]int) *Clien
 		gatewayURL: gatewayURL,
 		intents:    intents,
 		shard:      shard,
+		backoff:    time.Second,
 		stop:       make(chan struct{}),
 		stopped:    make(chan struct{}),
 	}
 }
 
-// Start 启动网关并阻塞直到进程退出（调用方应 go Start）。
-// 按错误类别决定后续策略：网络抖动走指数退避快速恢复；
-// opReconnect 保留会话走 RESUME 快速续连；会话失效走限额感知重新鉴权。
-// backoff 为跨重连周期持续的状态：瞬时失败逐次翻倍，恢复后归零，避免频率冲突。
+// Start 启动网关并阻塞直到进程退出（调用方应 go Start）
+// 网络抖动走指数退避; opReconnect 保留会话走 RESUME
+// 会话失效走限额感知重新鉴权; 服务端禁连时停止
 func (c *Client) Start() {
 	defer close(c.stopped)
-	backoff := time.Second
+	backoff := c.backoff
 	for {
 		if c.closed() {
 			return
@@ -97,39 +101,44 @@ func (c *Client) Start() {
 		err := c.run()
 		switch {
 		case err == nil:
-			// 理论上 run 不会正常返回；防御性兜底
 			if !c.breathe(time.Second) {
 				return
 			}
+		case errors.Is(err, errStop):
+			logger.Errorf("网关不可用, 停止重连: %v", err)
+			return
 		case errors.Is(err, errReconnect):
-			// 服务端要求重连：保留会话，短暂退避后 RESUME（续上新连接）
-			// 链路明确可用，重置退避阶梯，避免网络历史把新连接的重连拖慢。
-			backoff = time.Second
+			// 链路明确可用, 重置退避, 避免新连接被历史拖慢
+			backoff = c.backoff
 			if !c.breathe(jitter(time.Second)) {
 				return
 			}
 		case errors.Is(err, errInvalidSession):
-			// 会话被服务端丢弃：放弃旧会话，按启动限额决定何时重新鉴权
+			// 会话被服务端丢弃: 放弃旧会话, 按启动限额决定何时重新鉴权
 			c.dropSession()
 			if !c.waitForSlot() {
 				return
 			}
 		default:
-			// 网络层错误：指数退避（1s→30s）+ jitter 防惊群
 			delay := jitter(backoff)
-			logger.Warnf("网络断开重连：%v，%.0fs 后重试", err, delay.Seconds())
+			logger.Warnf("网络断开重连: %v, %.0fs 后重试", err, delay.Seconds())
 			if !c.breathe(delay) {
 				return
 			}
-			backoff = min(backoff*2, 30*time.Second)
+			backoff = min(backoff*2, maxBackoff)
 		}
 	}
 }
 
-// Stop 停止网关并清理资源。幂等，可被并发调用。
+// Stop 停止网关并回收连接与心跳任务。幂等。
 func (c *Client) Stop() {
 	c.stopOnce.Do(func() { close(c.stop) })
-	c.closeConn()
+	c.mu.Lock()
+	cur := c.cur
+	c.mu.Unlock()
+	if cur != nil {
+		cur.kill()
+	}
 	<-c.stopped
 }
 
@@ -138,7 +147,7 @@ type Status struct {
 	Connected bool   `json:"connected"`
 	SessionID string `json:"session_id"`
 	Seq       int64  `json:"seq"`
-	Heartbeat bool   `json:"heartbeat_ack"` // 上一次心跳是否已获 ACK
+	Heartbeat bool   `json:"heartbeat_ack"` // 是否已收到过心跳 ACK
 	SinceMS   int64  `json:"since_ms"`      // 当前连接已保持时长
 }
 
@@ -150,43 +159,12 @@ func (c *Client) Status() Status {
 		since = time.Since(c.connAt).Milliseconds()
 	}
 	return Status{
-		Connected: c.conn != nil,
+		Connected: c.online,
 		SessionID: c.sessionID,
 		Seq:       c.seq,
-		Heartbeat: c.acked,
+		Heartbeat: !c.ackAt.IsZero(),
 		SinceMS:   since,
 	}
-}
-
-func (c *Client) closed() bool {
-	select {
-	case <-c.stop:
-		return true
-	default:
-		return false
-	}
-}
-
-// breathe 在退避间隔与停止信号之间做选择；返回 false 表示应退出主循环。
-func (c *Client) breathe(d time.Duration) bool {
-	if d <= 0 {
-		return !c.closed()
-	}
-	select {
-	case <-c.stop:
-		return false
-	case <-time.After(d):
-		return !c.closed()
-	}
-}
-
-// jitter 在 d 基础上叠加 ±25% 随机抖动，避免多实例断线后同步重连（thundering herd）。
-func jitter(d time.Duration) time.Duration {
-	if d <= 0 {
-		return d
-	}
-	spread := int64(d) / 2
-	return d + time.Duration(rand.Int64N(spread)-spread/2)
 }
 
 func (c *Client) run() error {
@@ -198,137 +176,25 @@ func (c *Client) run() error {
 	if err != nil {
 		return fmt.Errorf("解析网关地址: %w", err)
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	ws, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("连接网关 %s: %w", u.Redacted(), err)
 	}
-	c.setConn(conn)
+	defer ws.Close()
 	c.mu.Lock()
 	c.connAt = time.Now()
+	c.online = false
 	c.mu.Unlock()
-	defer c.closeConn()
-	// 每个网络帧都要更新读超时，防止服务端异常静默导致读卡死。
-	conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 
-	if err := c.handshake(conn, token); err != nil {
-		return err
-	}
-	for {
-		_, raw, err := conn.ReadMessage()
-		if err != nil {
-			return err
-		}
-		var f frame
-		if err := json.Unmarshal(raw, &f); err != nil {
-			continue
-		}
-		if err := c.handle(conn, f, token); err != nil {
-			return err
-		}
-	}
-}
-
-func (c *Client) handshake(conn *websocket.Conn, token string) error {
-	for {
-		_, raw, err := conn.ReadMessage()
-		if err != nil {
-			return fmt.Errorf("握手读帧: %w", err)
-		}
-		var f frame
-		if err := json.Unmarshal(raw, &f); err != nil {
-			continue
-		}
-		if f.Op != opHello {
-			continue
-		}
-		var hello struct {
-			HeartbeatInterval int `json:"heartbeat_interval"`
-		}
-		json.Unmarshal(f.D, &hello)
-		if hello.HeartbeatInterval > 0 {
-			c.startHeartbeat(conn, hello.HeartbeatInterval)
-		}
-		payload := map[string]any{"token": "QQBot " + token}
-		if sessID := c.getSession(); sessID != "" {
-			// 有存活会话：走 RESUME，续上 seq，避免重新鉴权与事件重放。
-			payload["session_id"] = sessID
-			payload["seq"] = c.getSeq()
-			conn.WriteJSON(frame{Op: opResume, D: mustJSON(payload)})
-		} else {
-			payload["intents"] = c.intents
-			payload["shard"] = c.shard
-			conn.WriteJSON(frame{Op: opIdentify, D: mustJSON(payload)})
-		}
-		return nil
-	}
-}
-
-func (c *Client) startHeartbeat(conn *websocket.Conn, interval int) {
+	w := newConn(c, ws, token)
 	c.mu.Lock()
-	if c.ping != nil {
-		c.ping.Stop()
-	}
-	c.acked = true
-	c.ping = time.NewTicker(time.Duration(interval) * time.Millisecond)
-	ping := c.ping
+	c.cur = w
 	c.mu.Unlock()
-	go func() {
-		for range ping.C {
-			c.mu.Lock()
-			healthy := c.acked
-			c.acked = false
-			c.mu.Unlock()
-			if !healthy {
-				// 上次心跳未 ACK：连接假死，掐断触发重连。
-				c.closeConn()
-				return
-			}
-			conn.WriteJSON(frame{Op: opHeartbeat, D: mustJSON(map[string]any{"seq": c.getSeq()})})
-		}
-	}()
+	defer w.stopHeartbeat()
+	return w.serve()
 }
 
-func (c *Client) handle(conn *websocket.Conn, f frame, token string) error {
-	conn.SetReadDeadline(time.Now().Add(90 * time.Second))
-	switch f.Op {
-	case opHeartbeatACK:
-		c.mu.Lock()
-		c.acked = true
-		c.ackAt = time.Now()
-		c.mu.Unlock()
-	case opReconnect:
-		return errReconnect
-	case opInvalidSession:
-		// d=false 表示会话可恢复，重连时走 RESUME；d=true 表明会话已被服务端丢弃，必须重新鉴权。
-		if !bytesEq(f.D, false) {
-			return errInvalidSession
-		}
-		return fmt.Errorf("%w：可恢复会话，重连时 RESUME", errReconnect)
-	case opDispatch:
-		if f.T == "READY" {
-			var ready struct {
-				SessionID string `json:"session_id"`
-			}
-			json.Unmarshal(f.D, &ready)
-			c.setSession(ready.SessionID)
-			logger.Infof("连接就绪，session=%s", ready.SessionID)
-		}
-		if f.T == "RESUMED" {
-			logger.Infof("会话恢复成功")
-		}
-		if f.S > c.getSeq() {
-			c.mu.Lock()
-			c.seq = f.S
-			c.mu.Unlock()
-		}
-		if !constant.IsValidEventType(f.T) {
-			return nil
-		}
-		c.dispatch(f)
-	}
-	return nil
-}
-
+// dispatch 事件转发到中间件管线。
 func (c *Client) dispatch(f frame) {
 	payload := structers.Payload{
 		ID:        f.ID,
@@ -345,49 +211,53 @@ func (c *Client) dispatch(f frame) {
 	middleware.ProcessPayload(payload, c.api)
 }
 
-// dropSession 清空本地会话 token，下次握手强制走 IDENTIFY 重新鉴权。
-func (c *Client) dropSession() {
-	c.mu.Lock()
-	c.sessionID = ""
-	c.seq = 0
-	c.mu.Unlock()
-}
-
-// waitForSlot 会话失效后按 /gateway/bot 的 session_start_limit 决定重连时机：
-// remaining 还有配额则按短退避重排；配额耗尽则等到 reset_after 再试，避免触发 QQ 会话惩罚。
+// waitForSlot 会话失效后按 /gateway/bot 的 session_start_limit 决定重连时机。
 func (c *Client) waitForSlot() bool {
 	info, err := c.api.GatewayBot()
 	if err != nil {
-		// 限额接口不可用时不阻塞，退化为温和退避继续重试。
-		logger.Warnf("查询会话启动限额失败，按默认退避重连: %v", err)
+		logger.Warnf("查询会话启动限额失败, 按默认退避重连: %v", err)
 		return c.breathe(jitter(5 * time.Second))
 	}
 	if info.Limit.Remaining > 0 || info.Limit.ResetAfter <= 0 {
-		// 有剩余配额，稍等即重试；表现比为追上 reset_after 防御性多等。
-		logger.Warnf("会话失效，剩余启动配额 %d，稍后重新鉴权", info.Limit.Remaining)
+		logger.Warnf("会话失效, 剩余启动配额 %d, 稍后重新鉴权", info.Limit.Remaining)
 		return c.breathe(jitter(3 * time.Second))
 	}
-	// 配额耗尽：等待配额窗口重置。reset_after 单位为毫秒。
+	// 配额耗尽: 等待配额窗口重置, reset_after 单位为毫秒
 	wait := time.Duration(info.Limit.ResetAfter) * time.Millisecond
-	logger.Warnf("会话启动配额耗尽（%d/%d），%.0fm 后重新鉴权",
+	logger.Warnf("会话启动配额耗尽 (%d/%d), %.0fm 后重新鉴权",
 		info.Limit.Remaining, info.Limit.Total, wait.Minutes())
 	return c.breathe(wait)
 }
 
-func (c *Client) setConn(conn *websocket.Conn) {
-	c.mu.Lock()
-	c.conn = conn
-	c.mu.Unlock()
+func (c *Client) closed() bool {
+	select {
+	case <-c.stop:
+		return true
+	default:
+		return false
+	}
 }
 
-func (c *Client) closeConn() {
-	c.mu.Lock()
-	conn := c.conn
-	c.conn = nil
-	c.mu.Unlock()
-	if conn != nil {
-		conn.Close()
+// breathe 在退避间隔与停止信号之间选择; false 表示应退出主循环
+func (c *Client) breathe(d time.Duration) bool {
+	if d <= 0 {
+		return !c.closed()
 	}
+	select {
+	case <-c.stop:
+		return false
+	case <-time.After(d):
+		return !c.closed()
+	}
+}
+
+// jitter 在 d 基础上叠加 ±25% 随机抖动, 避免多实例同步重连
+func jitter(d time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	spread := int64(d) / 2
+	return d + time.Duration(rand.Int64N(spread)-spread/2)
 }
 
 func (c *Client) getSession() string {
@@ -408,7 +278,35 @@ func (c *Client) getSeq() int64 {
 	return c.seq
 }
 
-// bytesEq 判断 d 帧是否等价于给定布尔值（raw 可能是 true/false 或 "true"/"false"）。
+func (c *Client) bumpSeq(s int64) {
+	c.mu.Lock()
+	if s > c.seq {
+		c.seq = s
+	}
+	c.mu.Unlock()
+}
+
+func (c *Client) setOnline(v bool) {
+	c.mu.Lock()
+	c.online = v
+	c.mu.Unlock()
+}
+
+func (c *Client) markAck() {
+	c.mu.Lock()
+	c.ackAt = time.Now()
+	c.mu.Unlock()
+}
+
+// dropSession 清空本地会话, 下次握手强制 IDENTIFY
+func (c *Client) dropSession() {
+	c.mu.Lock()
+	c.sessionID = ""
+	c.seq = 0
+	c.mu.Unlock()
+}
+
+// bytesEq 判断 d 帧是否等价于给定布尔值（raw 可能是 true/false 或 "true"/"false"）
 func bytesEq(raw json.RawMessage, want bool) bool {
 	switch string(raw) {
 	case "true":

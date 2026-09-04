@@ -1,15 +1,11 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { api, LogsView, LogEntry } from '../api'
-import { Card, Badge, Icon, fmtClock, fmtDur, fmtBytes, fmtNum, fmtTime } from '../ui'
+import { Card, Badge, Icon, IconName, toast, fmtClock, fmtDur, fmtBytes, fmtNum, fmtTime } from '../ui'
 import { useLiveOverview, onLog, LiveOverview } from '../live'
-import { Trend } from '../components/trend'
-
-const MAX_POINTS = 60
 
 export default function OverviewPage(props: { uptime: () => string }) {
   const overview = useLiveOverview()
   const [recent, setRecent] = createSignal<LogEntry[]>([])
-  const [pts, setPts] = createSignal<number[][]>([[], []])
 
   // 首次进入拉一份日志历史, 之后由实时订阅增量补齐
   api<LogsView>('/api/logs?limit=12')
@@ -20,27 +16,43 @@ export default function OverviewPage(props: { uptime: () => string }) {
   })
   onCleanup(unlog)
 
-  let primed = false
-  let last = { recv: 0, sent: 0 }
+  // 快捷操作: 两步确认, 3 秒内再点执行
+  const [action, setAction] = createSignal<'restart' | 'stop' | null>(null)
+  const [arming, setArming] = createSignal(false)
+  const arm = (kind: 'restart' | 'stop') => {
+    setAction(kind)
+    setArming(true)
+  }
   createEffect(() => {
-    const ov = overview()
-    if (!ov) return
-    const c = ov.runtime.counters
-    if (!primed) {
-      primed = true
-      last = { recv: c.recv, sent: c.sent }
+    if (!arming()) return
+    const t = setTimeout(() => setArming(false), 3000)
+    onCleanup(() => clearTimeout(t))
+  })
+  const runAction = async (kind: 'restart' | 'stop') => {
+    setAction(null)
+    setArming(false)
+    toast(kind === 'restart' ? '重启指令已发出…' : '停止指令已发出…', 'info')
+    try {
+      await api(`/api/system/${kind}`, { method: 'POST', body: '{}' })
+    } catch (err) {
+      toast((err as Error).message, 'err')
       return
     }
-    const dr = Math.max(0, c.recv - last.recv)
-    const ds = Math.max(0, c.sent - last.sent)
-    last = { recv: c.recv, sent: c.sent }
-    const [ra, sa] = pts()
-    setPts([[...ra, dr].slice(-MAX_POINTS), [...sa, ds].slice(-MAX_POINTS)])
-  })
-
-  const rates = () => {
-    const p = pts()
-    return { recv: p[0][p[0].length - 1] ?? 0, sent: p[1][p[1].length - 1] ?? 0 }
+    if (kind === 'restart') {
+      // 轮询等待新进程就绪后整页刷新
+      const iv = setInterval(async () => {
+        try {
+          await api('/api/me')
+          clearInterval(iv)
+          location.reload()
+        } catch {
+          /* 进程尚未就绪 */
+        }
+      }, 2000)
+      setTimeout(() => clearInterval(iv), 120000)
+    } else {
+      toast('服务已停止', 'info')
+    }
   }
 
   const ov = () => overview() as LiveOverview
@@ -68,23 +80,25 @@ export default function OverviewPage(props: { uptime: () => string }) {
       </div>
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Card
-          title="实时流量"
-          actions={
-            <div class="flex flex-wrap gap-4">
-              <span class="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground tnum">
-                <i class="h-2 w-2 rounded-full" style={{ background: 'var(--chart-primary)' }} />
-                收 {rates().recv}/s
-              </span>
-              <span class="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground tnum">
-                <i class="h-2 w-2 rounded-full" style={{ background: 'var(--chart-2)' }} />
-                发 {rates().sent}/s
-              </span>
-            </div>
-          }
-        >
-          <div class="px-5 pb-4 pt-3">
-            <Trend series={pts} colors={['--chart-primary', '--chart-2']} height={150} />
+        <Card title="快捷操作">
+          <div class="flex flex-col gap-2.5 px-6 py-4">
+            <ActionRow
+              icon="refresh"
+              label="重启服务"
+              desc="配置修改后需重启生效"
+              armed={action() === 'restart' && arming()}
+              onArm={() => arm('restart')}
+              onRun={() => runAction('restart')}
+            />
+            <ActionRow
+              icon="power"
+              label="停止服务"
+              desc="停止后需手动拉起进程"
+              danger
+              armed={action() === 'stop' && arming()}
+              onArm={() => arm('stop')}
+              onRun={() => runAction('stop')}
+            />
           </div>
         </Card>
 
@@ -158,6 +172,39 @@ function LevelPill(props: { level: string }) {
     <span class={`inline-block justify-self-start rounded-full px-2 py-px text-[10px] font-semibold uppercase tracking-wider ${LEVEL_PILL[props.level] ?? LEVEL_PILL.INFO}`}>
       {props.level}
     </span>
+  )
+}
+
+function ActionRow(props: { icon: IconName; label: string; desc: string; danger?: boolean; armed: boolean; onArm: () => void; onRun: () => void }) {
+  return (
+    <button
+      class={`flex w-full cursor-pointer items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+        props.armed
+          ? props.danger
+            ? 'border-destructive/60 bg-destructive/10'
+            : 'border-primary-500/50 bg-primary-50 dark:bg-primary-400/15'
+          : props.danger
+            ? 'border-line-2 bg-card hover:border-destructive/40 hover:bg-destructive/5'
+            : 'border-line-2 bg-card hover:border-line-4 hover:bg-muted-hover'
+      }`}
+      onClick={props.armed ? props.onRun : props.onArm}
+    >
+      <span
+        class={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border ${
+          props.danger
+            ? 'border-destructive/25 bg-destructive/10 text-destructive'
+            : 'border-primary-500/20 bg-primary-50 text-primary-600 dark:bg-primary-400/15 dark:text-primary-300'
+        }`}
+      >
+        <Icon name={props.icon} size={15} />
+      </span>
+      <span class="min-w-0 flex-1">
+        <b class={`block text-[13px] font-medium ${props.armed ? (props.danger ? 'text-destructive' : 'text-primary-700 dark:text-primary-300') : 'text-foreground'}`}>
+          {props.armed ? `确认${props.label.replace('服务', '')}？再次点击执行` : props.label}
+        </b>
+        <small class="block truncate text-[11.5px] text-muted-foreground-2">{props.desc}</small>
+      </span>
+    </button>
   )
 }
 

@@ -2,9 +2,9 @@ package qqapi
 
 import (
 	"Plrx/lib/constant"
+	"Plrx/lib/requests"
 	"crypto/md5"
 	"crypto/sha1"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"strconv"
@@ -25,12 +25,20 @@ type auditResult struct {
 
 const auditTimeout = 30 * time.Second
 
+const uploadPartTimeout = time.Minute // 单分片直传 COS 的超时
+
 // waitAudit 注册审计等待并阻塞直到 audit 事件或超时。
 func (c *Client) waitAudit(auditID string) error {
 	ch := make(chan auditResult, 1)
 	auditMu.Lock()
 	auditWaiter[auditID] = ch
 	auditMu.Unlock()
+	defer func() {
+		// 无论结果还是超时都移除等待项, 防止 map 滞留
+		auditMu.Lock()
+		delete(auditWaiter, auditID)
+		auditMu.Unlock()
+	}()
 
 	select {
 	case r := <-ch:
@@ -100,7 +108,7 @@ func (c *Client) chunkedUpload(target constant.MessageOrigin, groupID, userID st
 		start := (part.Index - 1) * blockSize
 		end := min(start+blockSize, len(up.Data))
 		chunk := up.Data[start:end]
-		if err := c.Request.Put(part.PresignedURL, chunk, nil, nil); err != nil {
+		if _, err := c.Request.DoBytesTimeout("PUT", part.PresignedURL, requests.Bytes(chunk), nil, uploadPartTimeout); err != nil {
 			return "", fmt.Errorf("upload part %d: %w", part.Index, err)
 		}
 		type PartFinishRequest struct {
@@ -147,6 +155,3 @@ func sha1HexBytes(b []byte) string {
 	sum := sha1.Sum(b)
 	return hex.EncodeToString(sum[:])
 }
-
-// 供 base64 使用占位（避免 unused import 误伤）
-var _ = base64.StdEncoding

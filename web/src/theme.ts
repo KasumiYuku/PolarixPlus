@@ -1,7 +1,6 @@
 export type Theme = 'auto' | 'light' | 'dark'
 
 const KEY = 'px-theme'
-const ORDER: Theme[] = ['auto', 'light', 'dark']
 const LABEL: Record<Theme, string> = { auto: '跟随系统', light: '浅色', dark: '深色' }
 
 export function currentTheme(): Theme {
@@ -25,12 +24,6 @@ export function initTheme() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (currentTheme() === 'auto') sync('auto')
   })
-}
-
-export function nextTheme(): Theme {
-  const next = ORDER[(ORDER.indexOf(currentTheme()) + 1) % ORDER.length]
-  applyTheme(next)
-  return next
 }
 
 export { LABEL }

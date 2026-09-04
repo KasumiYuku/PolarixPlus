@@ -2,6 +2,7 @@ package requests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,6 +40,25 @@ func (c *Client) Do(method, rawURL string, body Body, result any, headers map[st
 
 // DoBytes 返回原始字节，由调用方自行解析。
 func (c *Client) DoBytes(method, rawURL string, body Body, headers map[string]string) ([]byte, error) {
+	req, err := buildReq(method, rawURL, body, headers)
+	if err != nil {
+		return nil, err
+	}
+	return c.do(req)
+}
+
+// DoBytesTimeout 带单次超时的请求, 用于分片直传等慢通道。
+func (c *Client) DoBytesTimeout(method, rawURL string, body Body, headers map[string]string, timeout time.Duration) ([]byte, error) {
+	req, err := buildReq(method, rawURL, body, headers)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(req.Context(), timeout)
+	defer cancel()
+	return c.do(req.WithContext(ctx))
+}
+
+func buildReq(method, rawURL string, body Body, headers map[string]string) (*http.Request, error) {
 	req, err := http.NewRequest(method, rawURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s request: %w", method, err)
@@ -54,7 +74,7 @@ func (c *Client) DoBytes(method, rawURL string, body Body, headers map[string]st
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	return c.do(req)
+	return req, nil
 }
 
 func (c *Client) Get(url string, result any, headers map[string]string) error {

@@ -18,7 +18,7 @@ import (
 
 var messageLog = logx.New("message")
 
-// commandDispatchOpts 群消息与私聊两条分发路径的差异参数。
+// commandDispatchOpts 群消息与私聊两条分发路径的差异参数
 type commandDispatchOpts struct {
 	prefix  string                 // 指令前缀
 	userID  string                 // 发送者 openid
@@ -29,7 +29,7 @@ type commandDispatchOpts struct {
 	checkPrivate bool
 }
 
-// dispatchCommand 从消息指令分发到对应插件处理器（群与私聊共用一条执行链）。
+// dispatchCommand 从消息指令分发到对应插件处理器（群与私聊共用一条执行链）
 func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts commandDispatchOpts) {
 	cmd, ok := plugin.GetCommand(opts.prefix)
 	if !ok {
@@ -70,7 +70,7 @@ func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts comma
 		return
 	}
 
-	// 解析器：优先反射到 ParserTarget 结构，否则落到 string。
+	// 解析器：优先反射到 ParserTarget 结构，否则落到 string
 	var parsed any
 	if cmd.ParserTarget != nil {
 		result := reflect.New(cmd.ParserTarget)
@@ -86,7 +86,7 @@ func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts comma
 		parsed = result
 	}
 	ctx.Parsed = parsed
-	go messageRecoveryFunc(cmd, targetCommand, ctx)
+	pool.Go(func() { messageRecoveryFunc(cmd, targetCommand, ctx) })
 }
 
 func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
@@ -153,7 +153,7 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			messageLog.Infof("回调按钮: %v未注册回调函数, 已回执交互", buttonId)
 			return
 		}
-		go callbackHandleFunc(callbackFunc, ctx)
+		pool.Go(func() { callbackHandleFunc(callbackFunc, ctx) })
 	case constant.GROUP_JOIN_REQUEST:
 		var answer string
 		switch payload.Data.VerifyInfo.Method {

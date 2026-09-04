@@ -18,6 +18,8 @@ type mediaUploadResponse struct {
 	FileInfo string `json:"file_info"`
 }
 
+const defaultTokenAPI = "https://bots.qq.com/app/getAppAccessToken"
+
 // Client QQ API 客户端。
 type Client struct {
 	ProxyAPI            string
@@ -29,18 +31,22 @@ type Client struct {
 	MarkdownVerifyImage bool
 	RetryWhen           []int
 	UploadThreshold     int // 超过该字节数用分片上传
+	TokenAPI            string
 
+	tokenReq    *requests.Client // token 签发通道, 独立超时
 	accessToken string
 	expireAt    time.Time
 	lock        sync.RWMutex
 }
 
-func Init(AppID string, AppSecret string, ProxyAPI string, requests *requests.Client) Client {
+func Init(AppID string, AppSecret string, ProxyAPI string, req *requests.Client) Client {
 	return Client{
 		AppID:     AppID,
 		AppSecret: AppSecret,
 		ProxyAPI:  ProxyAPI,
-		Request:   requests,
+		Request:   req,
+		TokenAPI:  defaultTokenAPI,
+		tokenReq:  requests.Init(20),
 		lock:      sync.RWMutex{},
 	}
 }
@@ -59,6 +65,14 @@ func (c *Client) SetMessageOptions(globalMarkdown, markdownVerifyImage bool, ret
 // AccessToken 返回当前有效的 access token（供外部使用，如 WebSocket 鉴权）。
 func (c *Client) AccessToken() (string, error) {
 	return c.getAccessToken()
+}
+
+// InvalidateToken 清空缓存的 access token, 下次调用强制重取。
+func (c *Client) InvalidateToken() {
+	c.lock.Lock()
+	c.accessToken = ""
+	c.expireAt = time.Time{}
+	c.lock.Unlock()
 }
 
 // GatewayBotInfo /gateway/bot 响应：网关地址 + 会话启动限额。
@@ -127,7 +141,7 @@ func (c *Client) getAccessToken() (string, error) {
 		ExpireTime  string `json:"expires_in"`
 	}
 	var tokenData TokenData
-	err := c.Request.Post("https://bots.qq.com/app/getAppAccessToken", initData, &tokenData, make(map[string]string))
+	err := c.tokenReq.Post(c.TokenAPI, initData, &tokenData, make(map[string]string))
 	if err != nil {
 		return "", err
 	}

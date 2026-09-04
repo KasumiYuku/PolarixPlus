@@ -1,8 +1,8 @@
-import { createResource, createSignal, onCleanup, Switch, Match, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, onCleanup, Switch, Match, For, Show } from 'solid-js'
 import { api } from './api'
 import { createRoute, navigate } from './router'
-import { Icon, Toasts, fmtDur } from './ui'
-import { currentTheme, applyTheme, LABEL } from './theme'
+import { Icon, IconName, Toasts, fmtDur } from './ui'
+import { currentTheme, applyTheme, Theme, LABEL } from './theme'
 import { connectLive, disconnectLive, useLiveOverview, LiveOverview } from './live'
 import Login from './pages/login'
 import OverviewPage from './pages/overview'
@@ -70,7 +70,25 @@ function Shell() {
   }
 
   const page = () => route()[0] ?? 'overview'
-  const theme = () => currentTheme()
+
+  // 主题: 信号驱动, 下拉菜单手动选择
+  const [theme, setTheme] = createSignal<Theme>(currentTheme())
+  const [themeOpen, setThemeOpen] = createSignal(false)
+  let themeRef: HTMLDivElement | undefined
+  createEffect(() => {
+    if (!themeOpen()) return
+    const close = (e: PointerEvent) => {
+      if (!themeRef?.contains(e.target as Node)) setThemeOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    onCleanup(() => document.removeEventListener('pointerdown', close))
+  })
+  const selectTheme = (t: Theme) => {
+    applyTheme(t)
+    setTheme(t)
+    setThemeOpen(false)
+  }
+  const themeIcon = () => (theme() === 'dark' ? 'moon' : theme() === 'light' ? 'sun' : 'monitor') as IconName
 
   const gatewayOnline = (): boolean | null => {
     const ov = overview()
@@ -137,14 +155,39 @@ function Shell() {
             </div>
           </Show>
 
-          <button
-            class="flex cursor-pointer items-center gap-2.5 rounded-full px-3.5 py-2 text-left text-[12.5px] text-muted-foreground transition-all duration-300 outline-none hover:bg-sidebar-nav-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary-500/40"
-            title="切换主题"
-            onClick={() => applyTheme(nextTheme())}
-          >
-            <Icon name={theme() === 'dark' ? 'moon' : 'sun'} size={14} class="shrink-0" />
-            <span>{LABEL[theme()]}</span>
-          </button>
+          <div ref={themeRef} class="relative">
+            <button
+              class="flex w-full cursor-pointer items-center gap-2.5 rounded-full px-3.5 py-2 text-left text-[12.5px] text-muted-foreground transition-all duration-300 outline-none hover:bg-sidebar-nav-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary-500/40"
+              title="选择主题"
+              onClick={() => setThemeOpen(!themeOpen())}
+            >
+              <Icon name={themeIcon()} size={14} class="shrink-0" />
+              <span>{LABEL[theme()]}</span>
+              <Icon name="chevron" size={12} class={`ml-auto shrink-0 transition-transform duration-300 ${themeOpen() ? 'rotate-180' : ''}`} />
+            </button>
+            <Show when={themeOpen()}>
+              <div class="absolute bottom-full left-0 z-50 mb-2 w-full min-w-[176px] rounded-xl border border-line-2 bg-popover p-1 shadow-xl shadow-black/10">
+                <For each={THEME_ITEMS}>
+                  {(item) => (
+                    <button
+                      class={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+                        theme() === item.value
+                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300'
+                          : 'text-muted-foreground hover:bg-sidebar-nav-hover hover:text-foreground'
+                      }`}
+                      onClick={() => selectTheme(item.value)}
+                    >
+                      <Icon name={item.icon} size={13} class="shrink-0" />
+                      <span>{item.label}</span>
+                      <Show when={theme() === item.value}>
+                        <Icon name="check" size={13} class="ml-auto shrink-0" />
+                      </Show>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
         </div>
       </aside>
 
@@ -179,10 +222,11 @@ function Shell() {
   )
 }
 
-function nextTheme(): 'auto' | 'light' | 'dark' {
-  const order = ['auto', 'light', 'dark'] as const
-  return order[(order.indexOf(currentTheme()) + 1) % order.length]
-}
+const THEME_ITEMS = [
+  { value: 'auto', label: '跟随系统', icon: 'monitor' },
+  { value: 'light', label: '浅色', icon: 'sun' },
+  { value: 'dark', label: '深色', icon: 'moon' },
+] as const
 
 function statusText(ov: LiveOverview | null, online: boolean | null): string {
   if (!ov) return '同步中'

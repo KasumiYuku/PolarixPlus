@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	requestsClient *requests.Client = requests.Init(5)
+	requestsClient *requests.Client = requests.Init(8)
 	logger                          = logx.New("system")
 )
 
@@ -197,7 +197,7 @@ func webhookHandler(client *qqapi.Client, appConfig config.AppConfig) gin.Handle
 			return
 		}
 		payload.EventType = constant.EventType(payload.T)
-		go middleware.ProcessPayload(payload, client)
+		middleware.ProcessAsync(payload, client)
 	}
 }
 
