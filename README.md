@@ -1,7 +1,8 @@
 # PolarixPlus
 
 > QQ 官方机器人轻量开发框架 · Go
-> 面向 QQ 官方开放平台的机器人框架：插件化命令系统、WebSocket / Webhook 双接入、内置管理面板与图床聚合，运行时零外部依赖。
+
+<img width="1791" height="875" alt="image" src="https://github.com/user-attachments/assets/c64a8e2b-dbd4-4bd1-958e-335ad33bf4bc" />
 
 > [!NOTE]
 > 本项目是 [YearnstudioYangyi/Polarix](https://github.com/YearnstudioYangyi/Polarix/tree/dev) 的个人 fork 改版，在保留上游核心框架的基础上定制与扩展
