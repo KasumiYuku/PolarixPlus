@@ -1,6 +1,7 @@
 package message
 
 import (
+	"Plrx/lib/constant"
 	"Plrx/lib/templates"
 	"encoding/json"
 )
@@ -28,10 +29,12 @@ func (msg *TextMessage) Marshal() ([]byte, error) {
 		}
 		type mdMsg struct {
 			*Message
-			Markdown templates.Markdown `json:"markdown"`
+			Type     constant.MessageType `json:"msg_type"`
+			Markdown templates.Markdown   `json:"markdown"`
 		}
 		return json.Marshal(mdMsg{
 			Message:  msg.Message,
+			Type:     constant.Markdown,
 			Markdown: templates.Markdown{Content: content},
 		})
 	}

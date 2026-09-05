@@ -11,6 +11,7 @@ import (
 	"Plrx/lib/qqapi"
 	"Plrx/lib/state"
 	"Plrx/lib/structers"
+	"Plrx/lib/templates"
 	"Plrx/lib/utils"
 	"fmt"
 	"strings"
@@ -79,23 +80,86 @@ func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts comma
 
 	if leaf.Args != nil {
 		// 声明式参数: kong 解析剩余词元, 失败回复用法
-		parsed, usage, err := parser.ParseArgs(leaf.Prefix, leaf.Args, rest)
+		parsed, _, err := parser.ParseArgs(commandPath, leaf.Args, rest)
 		if err != nil {
-			reply := fmt.Sprintf("指令参数有误: %v", err)
-			if usage != "" {
-				reply += "\n" + usage
+			content, terr := templates.FillMarkdownTemplate("Card", templates.Args{
+				"title": "❌ 指令参数错误",
+				"fields": []any{
+					map[string]any{"label": "用法", "content": usageText(commandPath, err)},
+				},
+			})
+			if terr != nil {
+				messageLog.Errorf("生成用法提示失败: %v", terr)
+				return
 			}
-			if err := ctx.Text(reply).Send(); err != nil {
-				messageLog.Errorf("发送用法提示失败: %v", err)
+			msg := ctx.Msg()
+			if opts.groupID != "" && ctx.UserId != "" {
+				msg.At(ctx.UserId, true)
+			}
+			if sendErr := msg.Markdown(content).Send(); sendErr != nil {
+				messageLog.Errorf("发送用法提示失败: %v", sendErr)
 			}
 			return
 		}
 		ctx.Parsed = parsed
 	} else {
-		// 快速通道: 剩余文本, 零反射
-		ctx.Parsed = strings.Join(rest, " ")
+		// 快速通道: 从原文剥离命令 token, 保留参数原始排版(换行/缩进不吞)。
+		ctx.Parsed = rawArgs(payload.Data.Content, tokens, rest, root)
 	}
 	pool.Go(func() { messageRecoveryFunc(root, leaf, ctx) })
+}
+
+// rawArgs 顺序扫描原文定位命令结束位置, 返回其后参数原文(排版不折叠)。
+// 粘合形态(参数紧贴命令词)按 "前缀符号+规范名" 精确切边界; 定位失败回退词元拼接。
+func rawArgs(content string, tokens, rest []string, root *plugin.Command) string {
+	n := len(tokens) - len(rest)
+	if n > 0 {
+		pos := 0
+		for _, tok := range tokens[:n] {
+			i := strings.Index(content[pos:], tok)
+			if i < 0 {
+				return strings.Join(rest, " ")
+			}
+			pos += i + len(tok)
+		}
+		return strings.TrimLeft(content[pos:], " \t\n")
+	}
+	for _, p := range constant.PrefixChars() {
+		if p != "" && strings.HasPrefix(tokens[0], p) {
+			i := strings.Index(content, tokens[0])
+			if i < 0 {
+				return strings.Join(rest, " ")
+			}
+			return content[i+len(p)+len(root.Prefix):]
+		}
+	}
+	return strings.Join(rest, " ")
+}
+
+// usageText 拼接指令用法文本: 前缀 + 指令路径 + 参数占位。
+func usageText(path string, err error) string {
+	prefix := ""
+	for _, p := range constant.PrefixChars() {
+		if p != "" {
+			prefix = p
+			break
+		}
+	}
+	usage := prefix + path
+	if args := quotedArgs(err.Error()); args != "" {
+		usage += " " + args
+	}
+	return usage
+}
+
+// quotedArgs 提取错误信息里引号包裹的参数占位, 如 expected "<uid> <code>"。
+func quotedArgs(s string) string {
+	i := strings.IndexByte(s, '"')
+	j := strings.LastIndexByte(s, '"')
+	if i < 0 || j <= i {
+		return ""
+	}
+	return s[i+1 : j]
 }
 
 func ProcessPayload(payload structers.Payload, client *qqapi.Client) {

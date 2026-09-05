@@ -87,21 +87,23 @@ func (manager *MessageManager) Media(fileInfo string) *message.MediaMessage {
 	return msg
 }
 
-// At 构造艾特部件。
-func (manager *MessageManager) At(openid string) *message.AtMessage {
+// At 构造艾特部件; newline 为 true 时 markdown 中 @ 后补换行独占一行。
+func (manager *MessageManager) At(openid string, newline ...bool) *message.AtMessage {
 	msg := &message.AtMessage{
 		Message: manager.baseStruct(),
 		OpenID:  openid,
+		Newline: len(newline) > 0 && newline[0],
 	}
 	msg.Type = constant.PlainText
 	return msg
 }
 
-// AtAll 构造 @所有人 部件。
-func (manager *MessageManager) AtAll() *message.AtMessage {
+// AtAll 构造 @所有人 部件; newline 同上。
+func (manager *MessageManager) AtAll(newline ...bool) *message.AtMessage {
 	msg := &message.AtMessage{
 		Message: manager.baseStruct(),
 		All:     true,
+		Newline: len(newline) > 0 && newline[0],
 	}
 	msg.Type = constant.PlainText
 	return msg

@@ -6,10 +6,12 @@ import (
 )
 
 // AtMessage 艾特部件：All 为 true 时艾特所有人。
+// Newline 为 true 时在 markdown 渲染的 @ 后补一个换行, 让艾特独占一行。
 type AtMessage struct {
 	*Message
-	OpenID string `json:"-"`
-	All    bool   `json:"-"`
+	OpenID  string `json:"-"`
+	All     bool   `json:"-"`
+	Newline bool   `json:"-"`
 }
 
 func (*AtMessage) part() {}

@@ -253,7 +253,7 @@ func (c *Client) dispatch(f frame) {
 			return
 		}
 	}
-	middleware.ProcessPayload(payload, c.api)
+	middleware.ProcessAsync(payload, c.api)
 }
 
 // waitForSlot 会话失效后按 /gateway/bot 的 session_start_limit 决定重连时机。

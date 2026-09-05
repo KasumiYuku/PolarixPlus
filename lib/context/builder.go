@@ -32,12 +32,12 @@ func (b *MsgBuilder) Text(s string) *MsgBuilder {
 	return b.Add(b.m.Text(s))
 }
 
-func (b *MsgBuilder) At(openid string) *MsgBuilder {
-	return b.Add(b.m.At(openid))
+func (b *MsgBuilder) At(openid string, newline ...bool) *MsgBuilder {
+	return b.Add(b.m.At(openid, newline...))
 }
 
-func (b *MsgBuilder) AtAll() *MsgBuilder {
-	return b.Add(b.m.AtAll())
+func (b *MsgBuilder) AtAll(newline ...bool) *MsgBuilder {
+	return b.Add(b.m.AtAll(newline...))
 }
 
 func (b *MsgBuilder) Markdown(s string) *MsgBuilder {
@@ -155,6 +155,10 @@ func (b *MsgBuilder) plan() []Sender {
 				inline.WriteString("<@")
 				inline.WriteString(v.OpenID)
 				inline.WriteString(">")
+			}
+			// 换行标记: 让 @ 独占一行, 后续内容另起
+			if v.Newline {
+				inline.WriteByte('\n')
 			}
 		case *message.MarkdownMessage:
 			inline.WriteString(v.Markdown.Content)

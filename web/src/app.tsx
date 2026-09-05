@@ -22,12 +22,17 @@ const NAV = [
 ]
 
 export default function App() {
-  const [me] = createResource(() => api<{ ok: boolean }>('/api/me'))
+  const route = createRoute()
+  const [me, { refetch }] = createResource(() => api<{ ok: boolean }>('/api/me'))
+  // 路由回落 #/login(会话失效/登出) 时重验鉴权, 自动切回登录页
+  createEffect(() => {
+    if (route()[0] === 'login') refetch()
+  })
   return (
     <>
       <Switch fallback={<Splash />}>
         <Match when={me.loading}> <Splash /> </Match>
-        <Match when={me.error}> <Login /> </Match>
+        <Match when={me.error}> <Login onAuthed={refetch} /> </Match>
         <Match when={me()}> <Shell /> </Match>
       </Switch>
       <Toasts />

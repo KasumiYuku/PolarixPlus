@@ -7,6 +7,7 @@ import (
 	"Plrx/lib/message"
 	"Plrx/lib/plugin"
 	"Plrx/lib/requests"
+	"Plrx/lib/templates"
 	"fmt"
 	"io"
 	"net/http"
@@ -108,7 +109,16 @@ func draw(ctx *context.MessageContext) error {
 
 	prompt := strings.TrimSpace(ctx.Parsed.(string))
 	if prompt == "" {
-		return ctx.Text("用法：/draw <图片描述>").Send()
+		content, err := templates.FillMarkdownTemplate("Card", templates.Args{
+			"title": "❌ 指令参数错误",
+			"fields": []any{
+				map[string]any{"label": "用法", "content": "/draw <图片描述>"},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		return ctx.Markdown(content).Send()
 	}
 	if err := ctx.Text("正在生成图片，请稍候...").Send(); err != nil {
 		return fmt.Errorf("send image generation progress: %w", err)

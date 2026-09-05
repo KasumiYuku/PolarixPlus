@@ -3,6 +3,7 @@ package plugin
 import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
+	"Plrx/lib/logx"
 	"cmp"
 	"fmt"
 	"slices"
@@ -11,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 )
+
+var regLog = logx.New("plugin")
 
 var GlobalCommands map[string]*Command = make(map[string]*Command)
 var aliasCommands = make(map[string]*Command)
@@ -21,7 +24,43 @@ var lock sync.RWMutex = sync.RWMutex{}
 var commandCount uint = 0
 var pluginDisabled atomic.Value // map[string]bool 快照: 停用插件集合, 读路径无锁
 
+// commandIndex 注册表只读快照, 热路径经 atomic 读取零锁。
+type commandIndex struct {
+	commands map[string]*Command
+	aliases  map[string]*Command
+	names    []string // 规范名有序, 粘合二分
+	access   map[string]AccessConfig
+}
+
+var registryStore atomic.Value // *commandIndex
+
+// publishRegistryLocked 重建注册表快照并发布, 热路径读零锁。须持写锁。
+func publishRegistryLocked() {
+	reg := &commandIndex{
+		commands: make(map[string]*Command, len(GlobalCommands)),
+		aliases:  make(map[string]*Command, len(aliasCommands)),
+		access:   make(map[string]AccessConfig, len(pluginAccess)),
+	}
+	for k, v := range GlobalCommands {
+		reg.commands[k] = v
+	}
+	for k, v := range aliasCommands {
+		reg.aliases[k] = v
+	}
+	for k, v := range pluginAccess {
+		reg.access[k] = v
+	}
+	names := make([]string, 0, len(GlobalCommands))
+	for name := range GlobalCommands {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	reg.names = names
+	registryStore.Store(reg)
+}
+
 // normalizeName 剥离注册名携带的前缀符号, 统一以规范名入注册表。
+// 注册先于配置加载, 运行时前缀集不可读, 故用固定符号表。
 func normalizeName(name string) string {
 	for _, p := range []string{"/", "#", "!"} {
 		if strings.HasPrefix(name, p) && len(name) > len(p) {
@@ -40,6 +79,9 @@ func buildIndex(command *Command, pluginId string) {
 		command.children = make(map[string]*Command, len(command.SubCommand)*2)
 		for _, sub := range command.SubCommand {
 			buildIndex(sub, pluginId)
+			if _, dup := command.children[sub.Prefix]; dup {
+				regLog.Warnf("子指令 %s 重复注册, 被覆盖", sub.Prefix)
+			}
 			command.children[sub.Prefix] = sub
 			for _, alias := range sub.Aliases {
 				command.children[normalizeName(alias)] = sub
@@ -57,12 +99,19 @@ func Register(plugin *Plugin) {
 			v.Handle = defaultCommandHandle
 		}
 		buildIndex(v, plugin.Id)
+		if existing, ok := GlobalCommands[v.Prefix]; ok {
+			regLog.Warnf("指令 %s 与插件 %s 冲突, 由 %s 覆盖", v.Prefix, existing.PluginId, plugin.Id)
+		}
 		GlobalCommands[v.Prefix] = v
 		for _, alias := range v.Aliases {
-			aliasCommands[normalizeName(alias)] = v
+			key := normalizeName(alias)
+			if existing, ok := aliasCommands[key]; ok {
+				regLog.Warnf("别名 %s 与插件 %s 冲突, 由 %s 覆盖", alias, existing.PluginId, plugin.Id)
+			}
+			aliasCommands[key] = v
 		}
 	}
-	rebuildNameIndexLocked()
+	publishRegistryLocked()
 }
 
 type ConfiguredPlugin struct {
@@ -154,6 +203,7 @@ func LoadAccessConfigurations(configs map[string]AccessConfig) error {
 		pluginAccess[id] = access
 	}
 	refreshDisabledLocked()
+	publishRegistryLocked()
 	return nil
 }
 
@@ -253,12 +303,13 @@ func ApplyAccessConfiguration(id string, access AccessConfig) {
 	defer lock.Unlock()
 	pluginAccess[id] = cloneAccessConfig(access)
 	refreshDisabledLocked()
+	publishRegistryLocked()
 }
 
+// CanUse 访问控制判定, 快照读零锁。
 func CanUse(pluginID, commandPath, userID, groupID string) bool {
-	lock.RLock()
-	defer lock.RUnlock()
-	access := pluginAccess[pluginID]
+	reg := registryStore.Load().(*commandIndex)
+	access := reg.access[pluginID]
 	rule, overridden := access.Commands[commandPath]
 	if !overridden {
 		rule = access.Default
@@ -273,18 +324,6 @@ func CanUse(pluginID, commandPath, userID, groupID string) bool {
 	default:
 		return true
 	}
-}
-
-// tokenCandidates 由词元派生匹配候选: 原词 + 逐前缀符号剥离。
-// 用于子指令名匹配, 故恒含原词(子指令名天然不带符号)。
-func tokenCandidates(token string) []string {
-	out := []string{token}
-	for _, p := range constant.PrefixChars() {
-		if p != "" && strings.HasPrefix(token, p) && len(token) > len(p) {
-			out = append(out, token[len(p):])
-		}
-	}
-	return out
 }
 
 // hasPrefixSymbol 词元是否携带已启用的前缀符号。
@@ -307,18 +346,26 @@ func isExactSymbol(token string) bool {
 	return false
 }
 
-// matchCommandName 按候选表解析词元为根指令; allowBare=false 时无符号裸词失配。
+// matchCommandName 按快照解析词元为根指令: 原词优先, 再逐前缀剥离; allowBare=false 时无符号裸词失配。
 func matchCommandName(token string, allowBare bool) (*Command, bool) {
 	if !allowBare && !hasPrefixSymbol(token) {
 		return nil, false
 	}
-	lock.RLock()
-	defer lock.RUnlock()
-	for _, cand := range tokenCandidates(token) {
-		if cmd, ok := GlobalCommands[cand]; ok {
+	reg := registryStore.Load().(*commandIndex)
+	if cmd, ok := reg.commands[token]; ok {
+		return cmd, true
+	}
+	if cmd, ok := reg.aliases[token]; ok {
+		return cmd, true
+	}
+	for _, p := range constant.PrefixChars() {
+		if p == "" || !strings.HasPrefix(token, p) || len(token) <= len(p) {
+			continue
+		}
+		if cmd, ok := reg.commands[token[len(p):]]; ok {
 			return cmd, true
 		}
-		if cmd, ok := aliasCommands[cand]; ok {
+		if cmd, ok := reg.aliases[token[len(p):]]; ok {
 			return cmd, true
 		}
 	}
@@ -330,41 +377,34 @@ func MatchCommand(token string) (*Command, bool) {
 	return matchCommandName(token, constant.HasBarePrefix())
 }
 
-// commandNames 规范名有序索引, 粘合匹配时二分定位最长前缀。
-var commandNames []string
-
-// rebuildNameIndex 注册后重建规范名索引, 须持写锁。
-func rebuildNameIndexLocked() {
-	names := make([]string, 0, len(GlobalCommands))
-	for name := range GlobalCommands {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	commandNames = names
-}
-
 // gluedCommand 带符号词元的粘合匹配: /echoilove you → echo + "ilove you"。
 // 仅当词元以已启用符号开头时尝试, 普通口语词不受影响。
 func gluedCommand(token string) (*Command, string, bool) {
-	if !hasPrefixSymbol(token) {
+	prefix := ""
+	for _, p := range constant.PrefixChars() {
+		if p != "" && strings.HasPrefix(token, p) && len(token) > len(p) {
+			prefix = p
+			break
+		}
+	}
+	if prefix == "" {
 		return nil, "", false
 	}
-	name := token[1:]
+	name := token[len(prefix):]
 	if name == "" {
 		return nil, "", false
 	}
-	lock.RLock()
-	defer lock.RUnlock()
+	reg := registryStore.Load().(*commandIndex)
 	// 找最大的规范名前缀: lower_bound 前驱是字典序最大的候选
-	idx := sort.SearchStrings(commandNames, name)
+	idx := sort.SearchStrings(reg.names, name)
 	if idx == 0 {
 		return nil, "", false
 	}
-	cand := commandNames[idx-1]
+	cand := reg.names[idx-1]
 	if !strings.HasPrefix(name, cand) || len(name) <= len(cand) {
 		return nil, "", false
 	}
-	cmd, ok := GlobalCommands[cand]
+	cmd, ok := reg.commands[cand]
 	if !ok {
 		return nil, "", false
 	}
@@ -420,10 +460,17 @@ func Resolve(root *Command, tokens []string) (*Command, string, []string) {
 	i := 0
 	for i < len(tokens) && len(current.children) > 0 {
 		var next *Command
-		for _, cand := range tokenCandidates(tokens[i]) {
-			if sub, ok := current.children[cand]; ok {
-				next = sub
-				break
+		if sub, ok := current.children[tokens[i]]; ok {
+			next = sub
+		} else {
+			for _, p := range constant.PrefixChars() {
+				if p == "" || !strings.HasPrefix(tokens[i], p) || len(tokens[i]) <= len(p) {
+					continue
+				}
+				if sub, ok := current.children[tokens[i][len(p):]]; ok {
+					next = sub
+					break
+				}
 			}
 		}
 		if next == nil {

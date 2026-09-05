@@ -470,7 +470,7 @@ export function MultiSelect(props: {
                   class={`flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-300 ${props.values.includes(opt) ? 'bg-primary-50 dark:bg-primary-400/10' : 'hover:bg-muted-hover'}`}
                   onClick={() => toggle(opt)}
                 >
-                  <Checkbox checked={props.values.includes(opt)} onChange={toggle} />
+                  <Checkbox checked={props.values.includes(opt)} onChange={() => toggle(opt)} />
                   <span class="flex-1 truncate font-mono text-xs text-foreground">{opt}</span>
                   <Show when={props.values.includes(opt)}>
                     <Icon name="check" size={14} class="text-primary-600 dark:text-primary-400" />

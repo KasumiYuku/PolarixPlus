@@ -63,6 +63,7 @@ func echoHandlefunc(context *context.MessageContext) error {
 		return nil
 	}
 	msg := context.Markdown(text)
+	//msg.QuoteTo(context.MessageId)
 	k := &buttons.Keyboard{}
 	btn, _ := k.AppendButton("callbacktest", "回调按钮测试", "点击了", buttons.Gray, 0)
 	btn.SetCallbackWithoutHandle(context.Content).SetUnsupportedTip("1").SetUserWhiteList(append(make([]string, 0), context.UserId))
@@ -90,15 +91,18 @@ func randomImg(context *context.MessageContext) error {
 	btn.SetAutoCommand("/random", true, false).SetUnsupportedTip("不支持按钮捏").SetPermission(buttons.AllUser)
 	return context.Msg().
 		Image(re.Url, "img", int(re.Width), int(re.Height)).
-		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n\n> 图片直链:\n```\n%v\n```", re.Url)).
+		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n\n> 图片直链:\n```text\n%v\n```", re.Url)).
 		Keyboard(k).
 		Send()
 }
 
 func getUid(context *context.MessageContext) error {
-	md, err := context.MarkdownTemplate("UserIdCard", &templates.Args{
-		"id":     context.UserId,
-		"msg_id": context.MessageId,
+	md, err := context.MarkdownTemplate("Card", &templates.Args{
+		"title": "当前用户ID",
+		"fields": []any{
+			map[string]any{"label": "ID", "content": context.UserId},
+			map[string]any{"label": "消息ID", "content": context.MessageId},
+		},
 	})
 	if err != nil {
 		return err
@@ -107,7 +111,15 @@ func getUid(context *context.MessageContext) error {
 }
 
 func getGid(context *context.MessageContext) error {
-	md := context.Markdown(fmt.Sprintf("## 当前群ID\n```\n%v\n```", context.GroupId))
+	md, err := context.MarkdownTemplate("Card", &templates.Args{
+		"title": "当前群ID",
+		"fields": []any{
+			map[string]any{"label": "群ID", "content": context.GroupId},
+		},
+	})
+	if err != nil {
+		return err
+	}
 	return md.Send()
 }
 

@@ -25,6 +25,8 @@ go build -o polarix .
 ./polarix
 ```
 
+重复启动无需手动停旧进程：新实例会自动终止占用端口的旧实例并接管。
+
 启动后访问 `http://127.0.0.1:端口/admin` 打开管理台。
 
 > 修改 `web/` 前端后需重新构建：`cd web && pnpm build`（产物输出到 `lib/admin/dist`）。只改 Go 代码无需前端。
@@ -179,7 +181,7 @@ func hello(ctx *context.MessageContext) error {
 
 ### 指令怎么被触发（前缀系统）
 
-- `config.json` 的 `prefixes` 字段决定允许哪些符号（`/` `#` `!` 与无前缀 `""`），管理台设置页可多选，重启生效，默认全开
+- `config.json` 的 `prefixes` 字段决定允许哪些符号（`/` `#` 与无前缀 `""`；`!` 可自行加入列表），管理台设置页可多选，重启生效，默认全开
 - 插件注册只需写规范名：`Prefix: "hello"`，误写成 `/hello` 也会被框架剥掉
 - 匹配是三态：精确 → 符号独立成词（`/ echo hi`）→ 粘合（`/echoilove you` 自动拆成 echo + "ilove you"，只对带符号的词元尝试，口语词不会被误伤）
 - 关闭"无前缀"后，不带符号的裸词不会命中任何指令
@@ -205,7 +207,7 @@ func hello(ctx *context.MessageContext) error {
 <details>
 <summary>参数解析：从"整句文本"到"声明式结构体"（点击展开）</summary>
 
-**什么都不声明** — 指令名之后的整段文本自动进 `ctx.Parsed` 作为字符串，适合"复读/翻译/画图"这类整句型指令：
+**什么都不声明** — 指令名之后的整段文本自动进 `ctx.Parsed` 作为字符串（换行与缩进原样保留），适合"复读/翻译/画图"这类整句型指令：
 
 ```go
 {Prefix: "echo", Handle: func(ctx *context.MessageContext) error {
@@ -300,7 +302,10 @@ ApplyConfig:    apply,      // 启动加载与每次保存后调用, 适合初�
 ```go
 ctx.Text("你好").Send()
 ctx.Markdown("## 标题\n正文").Send()
-ctx.UnsafeMarkdownTemplate("UserIdCard", &templates.Args{"id": ctx.UserId}).Send()
+ctx.UnsafeMarkdownTemplate("Card", &templates.Args{
+	"title":  "当前用户ID",
+	"fields": []any{map[string]any{"label": "ID", "content": ctx.UserId}},
+}).Send()
 
 // 图片：显式尺寸可选，缺省自动探测（WebP/PNG/JPEG/GIF）
 ctx.Image(url, "图", 800, 600).Send()
@@ -375,6 +380,15 @@ ctx.UserStorage.Get("k", &n)
 ```
 
 参数支持 `string / int / int64 / float64 / bool` 及嵌套 `map[string]any` / `[]any`。模板缺失、参数不足或类型不合法时返回错误（`UnsafeMarkdownTemplate` 则 panic）。
+
+列表渲染用 `{{#each key}}...{{/each}}` 段循环（不支持嵌套），段内 `{{field}}` 指向当前项字段，`key` 传 `[]any` 数组；空数组整段输出为空：
+
+```go
+ctx.MarkdownTemplate("Card", &templates.Args{
+	"title":  "❌ 指令参数错误",
+	"fields": []any{map[string]any{"label": "用法", "content": "/draw <描述>"}},
+})
+```
 
 **请求** — 统一用 `ctx.Request`，自带超时：
 

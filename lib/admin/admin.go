@@ -99,26 +99,20 @@ func triggerControl(c *gin.Context, action func(), name string) {
 	}()
 }
 
-// serveSPA 托管构建产物; 非 API 未知路径回退 index.html 支持前端路由。
+// serveSPA 托管构建产物; 未匹配的 GET 一律回退 index.html 支持前端路由,
+// 根路径与任意挂载前缀均可, 兼容裸域名/反代入口; 缺失的静态资源按扩展名 404。
 func serveSPA(c *gin.Context) {
 	if c.Request.Method != http.MethodGet {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	rel := strings.TrimPrefix(c.Request.URL.Path, "/admin")
-	if !strings.HasPrefix(c.Request.URL.Path, "/admin") {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	if rel == "" {
-		rel = "/"
-	}
-	if strings.HasPrefix(rel, "/api/") {
+	if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 		c.JSON(http.StatusNotFound, gin.H{"error": "接口不存在"})
 		return
 	}
 
-	name := strings.TrimPrefix(rel, "/")
+	name := strings.TrimPrefix(c.Request.URL.Path, "/admin")
+	name = strings.TrimPrefix(name, "/")
 	if name == "" {
 		name = "index.html"
 	}

@@ -118,10 +118,11 @@ function watch() {
     forceReopen()
     return
   }
-  // 反复建连仍无数据: 大概率会话失效, 探测 /api/me, 401 则回登录页
-  if (!es && now - lastActivity > 12000 && now - lastProbe > 30000) {
+  // 每 30s 主动探测会话健康; 401 时 api() 内部会跳登录。
+  // 覆登出/会话失效后 SSE 长连接仍存活推流、页面无 API 交互的停尸场景。
+  if (now - lastProbe > 30000) {
     lastProbe = now
-    api('/api/me').catch(() => {}) // 401 时 api() 内部会跳登录
+    api('/api/me').catch(() => {})
   }
 }
 

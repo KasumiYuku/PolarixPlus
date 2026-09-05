@@ -80,14 +80,23 @@ func ToMapString(h Args) (map[string]string, error) {
 	return result, nil
 }
 
-// processTemplate 匹配 {{ 任意内容 }}，提取参数名并规范化为紧凑格式。
+// processTemplate 规范化占位符并提取参数名; {{#each}} 段内的占位符跳过收集。
 func processTemplate(input string) (string, []string) {
 	re := regexp.MustCompile(`\{\{(.*?)\}\}`)
 	var args []string
 	seen := make(map[string]bool)
+	inEach := false
 	result := re.ReplaceAllStringFunc(input, func(match string) string {
 		trimmed := strings.TrimSpace(match[2 : len(match)-2])
-		if trimmed != "" && !seen[trimmed] {
+		switch {
+		case strings.HasPrefix(trimmed, "#each"):
+			inEach = true
+			return "{{" + trimmed + "}}"
+		case trimmed == "/each":
+			inEach = false
+			return "{{/each}}"
+		}
+		if trimmed != "" && !seen[trimmed] && !inEach {
 			seen[trimmed] = true
 			args = append(args, trimmed)
 		}
@@ -128,16 +137,76 @@ func ProcessMarkdownImages(input string) string {
 	})
 }
 
+// processEach 展开 {{#each key}}...{{/each}} 段。
+// key 对应 Args 中的 []any 数组, 段内 {{field}} 指向当前项字段; 不支持嵌套。
+// 缺失/类型不符报错, 显式传空数组则整段输出为空。
+func processEach(template string, arg Args, flat map[string]string) (string, error) {
+	if !strings.Contains(template, "{{#each") {
+		return template, nil
+	}
+	var out strings.Builder
+	rest := template
+	for {
+		start := strings.Index(rest, "{{#each")
+		if start < 0 {
+			out.WriteString(rest)
+			break
+		}
+		headEnd := strings.Index(rest[start:], "}}")
+		if headEnd < 0 {
+			return "", fmt.Errorf("invalid each tag: %s", rest[start:])
+		}
+		head := rest[start : start+headEnd+2]
+		key := strings.TrimSpace(strings.TrimPrefix(strings.TrimSuffix(head, "}}"), "{{#each"))
+		if key == "" {
+			return "", fmt.Errorf("invalid each tag: missing key")
+		}
+		bodyStart := start + len(head)
+		tailIdx := strings.Index(rest[bodyStart:], "{{/each}}")
+		if tailIdx < 0 {
+			return "", fmt.Errorf("each %s: missing {{/each}}", key)
+		}
+		body := rest[bodyStart : bodyStart+tailIdx]
+		if strings.Contains(body, "{{#each") {
+			return "", fmt.Errorf("each %s: nested each not supported", key)
+		}
+		arr, ok := arg[key].([]any)
+		if !ok {
+			return "", fmt.Errorf("each %s: arg must be []any, got %T", key, arg[key])
+		}
+		out.WriteString(rest[:start])
+		for i, item := range arr {
+			if _, ok := item.(map[string]any); !ok {
+				return "", fmt.Errorf("each %s: item %d must be map[string]any, got %T", key, i, item)
+			}
+			seg := body
+			prefix := key + ".#" + strconv.Itoa(i) + "."
+			for fk, fv := range flat {
+				if strings.HasPrefix(fk, prefix) {
+					seg = strings.ReplaceAll(seg, "{{"+fk[len(prefix):]+"}}", fv)
+				}
+			}
+			out.WriteString(seg)
+		}
+		rest = rest[bodyStart+tailIdx+len("{{/each}}"):]
+	}
+	return out.String(), nil
+}
+
 // FillMarkdownTemplate 填充模板参数并校验是否仍有未填充项。
 func FillMarkdownTemplate(Id string, arg Args) (string, error) {
-	args, err := ToMapString(arg)
+	flat, err := ToMapString(arg)
 	if err != nil {
 		return "", err
 	}
 	for _, v := range MarkdownTemplates {
 		if v.Id == Id {
 			template := v.Template
-			for key, value := range args {
+			template, err = processEach(template, arg, flat)
+			if err != nil {
+				return "", err
+			}
+			for key, value := range flat {
 				template = strings.ReplaceAll(template, "{{"+key+"}}", value)
 			}
 			_, after := processTemplate(template)

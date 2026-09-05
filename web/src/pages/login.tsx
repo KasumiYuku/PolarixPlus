@@ -2,7 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { post } from '../api'
 import { Button, Checkbox, Icon } from '../ui'
 
-export default function Login() {
+export default function Login({ onAuthed }: { onAuthed: () => void }) {
   const [password, setPassword] = createSignal('')
   const [remember, setRemember] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
@@ -14,8 +14,8 @@ export default function Login() {
     setError('')
     try {
       await post('/api/login', { password: password(), remember: remember() })
+      onAuthed() // 重新拉取鉴权态, 驱动 Shell 渲染, 不再整页 reload
       location.hash = '#/overview'
-      location.reload()
     } catch (err) {
       setError((err as Error).message || '登录失败')
     } finally {
