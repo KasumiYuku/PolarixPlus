@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { api, ManagedPlugin, AccessConfig, AccessRule, PluginField } from '../api'
-import { Button, Badge, Card, Empty, Field, SkeletonRows, Switch, toast } from '../ui'
+import { Button, Badge, Card, Empty, Field, Select, SkeletonRows, Switch, toast } from '../ui'
 import { navigate } from '../router'
 
 export default function PluginsPage(props: { route: () => string[] }) {
@@ -37,6 +37,7 @@ function PluginList() {
                 </div>
                 <p class="flex-1 text-[13px] leading-relaxed text-muted-foreground">{p.description || '暂无插件说明'}</p>
                 <div class="flex flex-wrap gap-2">
+                  <Badge tone={p.access.disabled ? 'dim' : 'ok'}>{p.access.disabled ? '已停用' : '已启用'}</Badge>
                   <Badge tone="accent">{p.fields.length} 项设置</Badge>
                   <Badge>{p.commands.length} 条指令</Badge>
                   <Badge tone={p.access.default.mode === 'off' ? 'dim' : 'ok'}>
@@ -113,6 +114,16 @@ function PluginDetail(props: { id: string }) {
               ← 返回插件目录
             </button>
           </div>
+
+          <Card title="插件状态" actions={<span class="text-xs text-muted-foreground-2">停用后指令与定时任务即时停止响应</span>}>
+            <div class="flex items-center justify-between gap-4 px-6 py-4">
+              <div>
+                <b class="block text-[14px] font-semibold text-foreground">{access().disabled ? '已停用' : '已启用'}</b>
+                <span class="mt-0.5 block text-xs text-muted-foreground-2">停用不卸载，随时可重新启用；旧配置兼容为启用</span>
+              </div>
+              <Switch checked={!access().disabled} onChange={(v) => setAccess((cur) => ({ ...cur, disabled: !v }))} />
+            </div>
+          </Card>
 
           <Card title="插件设置" actions={<span class="text-xs text-muted-foreground-2">保存后即时生效</span>}>
             <Show when={p.fields.length} fallback={<Empty text="此插件没有自定义设置" />}>
@@ -196,15 +207,17 @@ function RuleEditor(props: {
           <b class="block text-[14px] font-semibold text-foreground">{props.title}</b>
           <span class="ml-1 text-xs text-muted-foreground-2">{props.hint}</span>
         </div>
-        <select
-          class="h-9 min-w-[130px] rounded-full border border-line-3 bg-field px-3.5 text-[12.5px] text-foreground outline-none transition-colors duration-300 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
-          value={props.rule.mode}
-          onChange={(e) => props.onChange({ mode: e.currentTarget.value as AccessRule['mode'] })}
-        >
-          <option value="off">关闭限制</option>
-          <option value="whitelist">白名单</option>
-          <option value="blacklist">黑名单</option>
-        </select>
+        <div class="w-[150px] shrink-0">
+          <Select
+            options={[
+              { label: '关闭限制', value: 'off' },
+              { label: '白名单', value: 'whitelist' },
+              { label: '黑名单', value: 'blacklist' },
+            ]}
+            value={props.rule.mode}
+            onChange={(v) => props.onChange({ mode: v as AccessRule['mode'] })}
+          />
+        </div>
       </div>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label class="flex flex-col gap-1.5 text-[12.5px] text-muted-foreground">

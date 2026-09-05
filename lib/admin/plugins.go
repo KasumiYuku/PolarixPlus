@@ -56,6 +56,7 @@ func registerPluginRoutes(api *gin.RouterGroup) {
 		persisted := config.AccessConfig{
 			Default:  toConfigAccessRule(prepared.Default),
 			Commands: make(map[string]config.AccessRule, len(prepared.Commands)),
+			Disabled: prepared.Disabled,
 		}
 		for path, rule := range prepared.Commands {
 			persisted.Commands[path] = toConfigAccessRule(rule)

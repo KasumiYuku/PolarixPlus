@@ -34,6 +34,7 @@ var coreSpecs = []coreField{
 	{Key: "database", Label: "SQLite 数据库文件", Kind: "text", Restart: true},
 	{Key: "protocol", Label: "协议模式", Kind: "select", Options: []string{"webhook", "websocket"}, Restart: true},
 	{Key: "intents", Label: "WebSocket 订阅事件", Desc: "至少选一个；全不选时启动使用默认订阅", Kind: "multiselect", Options: gateway.IntentEvents(), Restart: true},
+	{Key: "prefixes", Label: "指令前缀符号", Desc: "多选；取消「无前缀」后 confirm 等无前缀指令需带符号触发", Kind: "multiselect", Options: []string{"!", "/", "#", "无前缀"}, Restart: true},
 	{Key: "admin_password", Label: "管理密码", Desc: "留空保持原值; 修改后现有会话立即失效", Kind: "secret", Hot: true},
 	{Key: "log_level", Label: "控制台日志级别", Kind: "select", Options: []string{"debug", "info", "warn", "error"}, Hot: true},
 	{Key: "global_markdown", Label: "全局 Markdown 回复", Kind: "bool", Hot: true},
@@ -72,6 +73,8 @@ func applyCoreValue(field *coreField, cfg config.AppConfig) {
 		field.Value = cfg.Protocol
 	case "intents":
 		field.Value = cfg.Intents
+	case "prefixes":
+		field.Value = displayPrefixes(cfg.Prefixes)
 	case "plugins":
 		field.Value = cfg.Plugins
 	case "log_level":
@@ -147,6 +150,25 @@ func handlePutConfig(deps Deps) gin.HandlerFunc {
 					}
 				}
 			}
+			if key == "prefixes" {
+				var selected []string
+				if err := json.Unmarshal(raw, &selected); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "prefixes 格式无效"})
+					return
+				}
+				converted := make([]string, 0, len(selected))
+				for _, p := range selected {
+					if p == "无前缀" {
+						converted = append(converted, "")
+					} else if slices.Contains([]string{"!", "/", "#"}, p) {
+						converted = append(converted, p)
+					} else {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "未知前缀符号: " + p})
+						return
+					}
+				}
+				raw, _ = json.Marshal(converted)
+			}
 			overrides[key] = raw
 			if spec.Hot {
 				hotChanged = append(hotChanged, key)
@@ -209,4 +231,17 @@ func hasAny(haystack []string, needles ...string) bool {
 		}
 	}
 	return false
+}
+
+// displayPrefixes 配置值转设置页展示值: 空串以「无前缀」呈现。
+func displayPrefixes(prefixes []string) []string {
+	out := make([]string, 0, len(prefixes))
+	for _, p := range prefixes {
+		if p == "" {
+			out = append(out, "无前缀")
+		} else {
+			out = append(out, p)
+		}
+	}
+	return out
 }

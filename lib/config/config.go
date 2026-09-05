@@ -1,6 +1,7 @@
 package config
 
 import (
+	"Plrx/lib/constant"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ type AppConfig struct {
 	RetryWhen           []int                     `json:"retry_when,omitempty"`
 	UploadThreshold     int                       `json:"upload_threshold,omitempty"` // 分片上传阈值(字节)
 	LogLevel            string                    `json:"log_level,omitempty"`        // 控制台最低级别
+	Prefixes            []string                  `json:"prefixes,omitempty"`         // 指令前缀符号, "" 为无前缀
 	PluginSettings      map[string]map[string]any `json:"plugin_settings"`
 	PluginAccess        map[string]AccessConfig   `json:"plugin_access"`
 }
@@ -46,6 +48,7 @@ type AccessRule struct {
 type AccessConfig struct {
 	Default  AccessRule            `json:"default"`
 	Commands map[string]AccessRule `json:"commands,omitempty"`
+	Disabled bool                  `json:"disabled,omitempty"` // 停用整个插件
 }
 
 // current 运行期配置的内存态, 所有写盘路径都会刷新它。
@@ -95,6 +98,9 @@ func normalize(cfg *AppConfig) {
 			"INTERACTION_CREATE", "GROUP_JOIN_REQUEST", "GROUP_MEMBER_ADD", "GROUP_MEMBER_REMOVE",
 			"MESSAGE_AUDIT_PASS", "MESSAGE_AUDIT_REJECT", "GROUP_ADD_ROBOT", "GROUP_DEL_ROBOT",
 		}
+	}
+	if cfg.Prefixes == nil {
+		cfg.Prefixes = constant.DefaultPrefixChars()
 	}
 }
 

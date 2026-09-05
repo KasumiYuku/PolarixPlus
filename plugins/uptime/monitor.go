@@ -10,28 +10,23 @@ import (
 )
 
 func init() {
-	subcommand := make([]*plugin.Command, 0)
-	subcommand = append(subcommand, &plugin.Command{
-		Prefix: "add",
-		Role:   constant.RoleAdmin,
+	commands := make([]*plugin.Command, 0)
+	commands = append(commands, &plugin.Command{
+		Prefix:   "uptime",
+		Role:     constant.RoleAdmin,
+		Describe: "服务状态帮助",
+		Handle:   helpText,
 	})
-
-	command := make([]*plugin.Command, 0)
-	command = append(command, &plugin.Command{
-		Prefix:     "/uptime",
-		Role:       constant.RoleAdmin,
-		Handle:     helpText,
-		SubCommand: subcommand,
-	})
-
-	command = append(command, &plugin.Command{
-		Prefix: "/openai",
-		Handle: openAIStatus,
+	commands = append(commands, &plugin.Command{
+		Prefix:   "openai",
+		Role:     constant.RoleMember,
+		Describe: "OpenAI 服务状态",
+		Handle:   openAIStatus,
 	})
 
 	self := &plugin.Plugin{
 		Id:       "uptime",
-		Commands: command,
+		Commands: commands,
 	}
 	plugin.Register(self)
 }

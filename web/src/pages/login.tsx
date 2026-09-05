@@ -1,6 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { post } from '../api'
-import { Button, Icon } from '../ui'
+import { Button, Checkbox, Icon } from '../ui'
 
 export default function Login() {
   const [password, setPassword] = createSignal('')
@@ -64,13 +64,8 @@ export default function Login() {
           />
         </label>
 
-        <label class="mb-7 flex cursor-pointer select-none items-center gap-2.5">
-          <input
-            type="checkbox"
-            class="h-4 w-4 accent-[var(--primary-600)]"
-            checked={remember()}
-            onChange={(e) => setRemember(e.currentTarget.checked)}
-          />
+        <label class="mb-7 flex cursor-pointer select-none items-center gap-2.5" onClick={() => setRemember(!remember())}>
+          <Checkbox checked={remember()} onChange={setRemember} />
           <span class="text-[12.5px] text-muted-foreground">记住密码</span>
         </label>
 

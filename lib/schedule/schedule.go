@@ -4,6 +4,7 @@ import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
 	"Plrx/lib/logx"
+	"Plrx/lib/plugin"
 	"Plrx/lib/qqapi"
 	"sync"
 	"time"
@@ -345,6 +346,10 @@ func fire(rj *registeredJob) {
 		}
 	}()
 
+	// 插件停用后其定时任务不再触发
+	if job.PluginId != "" && !plugin.Enabled(job.PluginId) {
+		return
+	}
 	ctx := &context.ScheduleContext{}
 	ctx.Init(client)
 	ctx.JobId = job.Id

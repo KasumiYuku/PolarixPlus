@@ -6,13 +6,13 @@ import (
 	"Plrx/lib/context"
 	"Plrx/lib/logx"
 	"Plrx/lib/message"
+	"Plrx/lib/parser"
 	"Plrx/lib/plugin"
 	"Plrx/lib/qqapi"
 	"Plrx/lib/state"
 	"Plrx/lib/structers"
 	"Plrx/lib/utils"
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -20,7 +20,6 @@ var messageLog = logx.New("message")
 
 // commandDispatchOpts 群消息与私聊两条分发路径的差异参数
 type commandDispatchOpts struct {
-	prefix  string                 // 指令前缀
 	userID  string                 // 发送者 openid
 	groupID string                 // 群 openid（私聊为空）
 	origin  constant.MessageOrigin // 发送目标
@@ -29,12 +28,21 @@ type commandDispatchOpts struct {
 	checkPrivate bool
 }
 
-// dispatchCommand 从消息指令分发到对应插件处理器（群与私聊共用一条执行链）
+// dispatchCommand 指令解析与分发: 三态智能匹配 + 树路由 + kong 参数解析。
 func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts commandDispatchOpts) {
-	cmd, ok := plugin.GetCommand(opts.prefix)
+	tokens := strings.Fields(payload.Data.Content)
+	if len(tokens) == 0 {
+		return
+	}
+	root, afterRoot, ok := plugin.ResolveRoot(tokens)
 	if !ok {
 		return
 	}
+	if !plugin.Enabled(root.PluginId) {
+		return
+	}
+	leaf, commandPath, rest := plugin.Resolve(root, afterRoot)
+
 	ctx := &context.MessageContext{
 		UserMessage: message.UserMessage{
 			Content:     payload.Data.Content,
@@ -43,50 +51,51 @@ func dispatchCommand(payload structers.Payload, client *qqapi.Client, opts comma
 		Raw: opts.raw,
 	}
 	ctx.Init(payload.Data.Id, payload.ID, client)
-	ctx.BindStorage(cmd.PluginId, cmd.Prefix)
+	ctx.BindStorage(leaf.PluginId, commandPath)
 	if opts.groupID != "" {
 		ctx.SetGroupId(opts.groupID)
 	}
 	ctx.SetUserId(opts.userID)
 	ctx.SetMessageOrigin(opts.origin)
 
-	targetCommand, commandPath := plugin.ResolveCommand(cmd, payload.Data.Content)
-	if !cmd.Role.CanUse(payload.Data.Author.Role) {
-		messageLog.Warnf("用户%v无权限使用%v指令", payload.Data.Author.Username, cmd.Prefix)
-		permissionDenied(cmd, ctx)
+	if !root.Role.CanUse(payload.Data.Author.Role) {
+		messageLog.Warnf("用户%v无权限使用%v指令", payload.Data.Author.Username, root.Prefix)
+		permissionDenied(root, ctx)
 		return
 	}
-	if targetCommand != cmd && !targetCommand.Role.CanUse(payload.Data.Author.Role) {
+	if leaf != root && !leaf.Role.CanUse(payload.Data.Author.Role) {
 		messageLog.Warnf("用户%v无权限使用%v指令", payload.Data.Author.Username, commandPath)
-		permissionDenied(targetCommand, ctx)
+		permissionDenied(leaf, ctx)
 		return
 	}
-	if opts.checkPrivate && (cmd.DisablePrivate || targetCommand.DisablePrivate) {
-		permissionDenied(targetCommand, ctx)
+	if opts.checkPrivate && (root.DisablePrivate || leaf.DisablePrivate) {
+		permissionDenied(leaf, ctx)
 		return
 	}
-	if !plugin.CanUse(cmd.PluginId, commandPath, opts.userID, opts.groupID) {
-		permissionDenied(targetCommand, ctx)
+	if !plugin.CanUse(root.PluginId, commandPath, opts.userID, opts.groupID) {
+		permissionDenied(leaf, ctx)
 		return
 	}
 
-	// 解析器：优先反射到 ParserTarget 结构，否则落到 string
-	var parsed any
-	if cmd.ParserTarget != nil {
-		result := reflect.New(cmd.ParserTarget)
-		if err := cmd.Parser.Parse(payload.Data.Content, result.Interface()); err != nil {
+	if leaf.Args != nil {
+		// 声明式参数: kong 解析剩余词元, 失败回复用法
+		parsed, usage, err := parser.ParseArgs(leaf.Prefix, leaf.Args, rest)
+		if err != nil {
+			reply := fmt.Sprintf("指令参数有误: %v", err)
+			if usage != "" {
+				reply += "\n" + usage
+			}
+			if err := ctx.Text(reply).Send(); err != nil {
+				messageLog.Errorf("发送用法提示失败: %v", err)
+			}
 			return
 		}
-		parsed = result.Interface()
+		ctx.Parsed = parsed
 	} else {
-		var result string
-		if err := cmd.Parser.Parse(payload.Data.Content, &result); err != nil {
-			return
-		}
-		parsed = result
+		// 快速通道: 剩余文本, 零反射
+		ctx.Parsed = strings.Join(rest, " ")
 	}
-	ctx.Parsed = parsed
-	pool.Go(func() { messageRecoveryFunc(cmd, targetCommand, ctx) })
+	pool.Go(func() { messageRecoveryFunc(root, leaf, ctx) })
 }
 
 func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
@@ -95,18 +104,11 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 		state.IncRecv()
 		raw := payload.Data.Content
 		payload.Data.Content = utils.FilterAt(payload.Data.Content)
-		msgs := strings.Split(payload.Data.Content, " ")
-		prefix := msgs[0]
-		// @ 机器人场景：第一个 token 是 <@openid>，指令实际从第二个开始
-		if len(msgs) > 1 && (strings.HasPrefix(msgs[0], "\u003c@") || strings.HasPrefix(msgs[0], "<@")) && strings.HasSuffix(msgs[0], ">") {
-			prefix = msgs[1]
-		}
 		userID := payload.Data.Author.MemberOpenID
 		if userID == "" {
 			userID = payload.Data.Author.UnionID
 		}
 		dispatchCommand(payload, client, commandDispatchOpts{
-			prefix:  prefix,
 			userID:  userID,
 			groupID: payload.Data.GroupOpenID,
 			origin:  constant.GroupMessage,
@@ -120,7 +122,6 @@ func ProcessPayload(payload structers.Payload, client *qqapi.Client) {
 			return
 		}
 		dispatchCommand(payload, client, commandDispatchOpts{
-			prefix:       strings.Fields(payload.Data.Content)[0],
 			userID:       payload.Data.Author.UserOpenID,
 			origin:       constant.PrivateMessage,
 			raw:          raw,

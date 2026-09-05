@@ -1,12 +1,14 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
-	"net/url"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"Plrx/lib/constant"
@@ -69,7 +71,11 @@ type Client struct {
 
 	stopOnce sync.Once
 	stop     chan struct{}
+	cancel   context.CancelFunc // 根上下文取消, 掐断一切在途建连
+	stopCtx  context.Context
 	stopped  chan struct{}
+
+	readyN atomic.Uint64 // READY/RESUMED 次数, 重连护栏判定依据
 }
 
 // New 创建网关客户端。
@@ -77,6 +83,7 @@ func New(api *qqapi.Client, gatewayURL string, intents int, shard [2]int) *Clien
 	if shard[0] == 0 && shard[1] == 0 {
 		shard = [2]int{0, 1}
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Client{
 		api:        api,
 		gatewayURL: gatewayURL,
@@ -84,6 +91,8 @@ func New(api *qqapi.Client, gatewayURL string, intents int, shard [2]int) *Clien
 		shard:      shard,
 		backoff:    time.Second,
 		stop:       make(chan struct{}),
+		stopCtx:    ctx,
+		cancel:     cancel,
 		stopped:    make(chan struct{}),
 	}
 }
@@ -94,10 +103,12 @@ func New(api *qqapi.Client, gatewayURL string, intents int, shard [2]int) *Clien
 func (c *Client) Start() {
 	defer close(c.stopped)
 	backoff := c.backoff
+	strikes := 0 // 连续未就绪的重连次数, 达标强制重新鉴权
 	for {
 		if c.closed() {
 			return
 		}
+		before := c.readyN.Load()
 		err := c.run()
 		switch {
 		case err == nil:
@@ -110,6 +121,8 @@ func (c *Client) Start() {
 		case errors.Is(err, errReconnect):
 			// 链路明确可用, 重置退避, 避免新连接被历史拖慢
 			backoff = c.backoff
+			logger.Infof("服务端要求重连, 1s 后恢复会话")
+			strikes = c.countStrike(strikes, before)
 			if !c.breathe(jitter(time.Second)) {
 				return
 			}
@@ -122,6 +135,7 @@ func (c *Client) Start() {
 		default:
 			delay := jitter(backoff)
 			logger.Warnf("网络断开重连: %v, %.0fs 后重试", err, delay.Seconds())
+			strikes = c.countStrike(strikes, before)
 			if !c.breathe(delay) {
 				return
 			}
@@ -130,9 +144,26 @@ func (c *Client) Start() {
 	}
 }
 
+// countStrike 记录一轮未就绪重连; 连续 5 次未 READY 强制丢会话重新鉴权。
+func (c *Client) countStrike(strikes int, before uint64) int {
+	if c.readyN.Load() != before {
+		return 0
+	}
+	strikes++
+	if strikes >= 5 {
+		c.dropSession()
+		logger.Warnf("连续 %d 次重连未就绪, 强制重新鉴权", strikes)
+		return 0
+	}
+	return strikes
+}
+
 // Stop 停止网关并回收连接与心跳任务。幂等。
 func (c *Client) Stop() {
-	c.stopOnce.Do(func() { close(c.stop) })
+	c.stopOnce.Do(func() {
+		close(c.stop)
+		c.cancel()
+	})
 	c.mu.Lock()
 	cur := c.cur
 	c.mu.Unlock()
@@ -167,18 +198,32 @@ func (c *Client) Status() Status {
 	}
 }
 
+// dial 建连并握手; ctx 绑定停止信号, 任何阶段可被 Stop 打断。
+// 显式超时兜底: TCP 5s + 握手 15s, 不依赖库默认值。
+func (c *Client) dial(ctx context.Context) (*websocket.Conn, error) {
+	d := &websocket.Dialer{
+		HandshakeTimeout: 15 * time.Second,
+		NetDialContext:   (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	}
+	ws, _, err := d.DialContext(ctx, c.gatewayURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	// 握手完成后取消 Dial 超时约束, 交由心跳护栏管理连接
+	ws.SetReadDeadline(time.Now().Add(readWindow))
+	return ws, nil
+}
+
 func (c *Client) run() error {
+	ctx, cancel := context.WithCancel(c.stopCtx)
+	defer cancel()
 	token, err := c.api.AccessToken()
 	if err != nil {
 		return fmt.Errorf("获取 access token: %w", err)
 	}
-	u, err := url.Parse(c.gatewayURL)
+	ws, err := c.dial(ctx)
 	if err != nil {
-		return fmt.Errorf("解析网关地址: %w", err)
-	}
-	ws, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	if err != nil {
-		return fmt.Errorf("连接网关 %s: %w", u.Redacted(), err)
+		return fmt.Errorf("连接网关 %s: %w", c.gatewayURL, err)
 	}
 	defer ws.Close()
 	c.mu.Lock()
@@ -298,23 +343,14 @@ func (c *Client) markAck() {
 	c.mu.Unlock()
 }
 
+func (c *Client) markReady() { c.readyN.Add(1) }
+
 // dropSession 清空本地会话, 下次握手强制 IDENTIFY
 func (c *Client) dropSession() {
 	c.mu.Lock()
 	c.sessionID = ""
 	c.seq = 0
 	c.mu.Unlock()
-}
-
-// bytesEq 判断 d 帧是否等价于给定布尔值（raw 可能是 true/false 或 "true"/"false"）
-func bytesEq(raw json.RawMessage, want bool) bool {
-	switch string(raw) {
-	case "true":
-		return want
-	case "false":
-		return !want
-	}
-	return false
 }
 
 func mustJSON(v any) json.RawMessage {

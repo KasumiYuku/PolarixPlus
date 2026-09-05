@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+// commandNormalizer 由框架注入: 按当前启用的前缀符号重写按钮命令文本。
+var commandNormalizer func(string) string
+
+func SetCommandNormalizer(fn func(string) string) { commandNormalizer = fn }
+
 func GenerateJson(keyboard Keyboard) ([]byte, error) {
 	if len(keyboard.Rows) == 0 {
 		return make([]byte, 0), nil
@@ -37,7 +42,11 @@ func GenerateJson(keyboard Keyboard) ([]byte, error) {
 			case Callback:
 				value.JsonData.Data = value.CallbackData
 			case Command:
-				value.JsonData.Data = value.Msg
+				msg := value.Msg
+				if commandNormalizer != nil {
+					msg = commandNormalizer(msg)
+				}
+				value.JsonData.Data = msg
 			case Link:
 				value.JsonData.Data = value.Url
 			}

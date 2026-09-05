@@ -3,8 +3,6 @@ package plugin
 import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
-	"Plrx/lib/parser"
-	"reflect"
 )
 
 type CommandHandleFunc func(*context.MessageContext) error
@@ -12,7 +10,8 @@ type PermissionDeniedHandleFunc func(*context.MessageContext) error
 type CommandErrorHandleFunc func(*context.MessageContext, error) error
 
 type Command struct {
-	Prefix             string                     // 指令前缀
+	Prefix             string                     // 规范指令名
+	Aliases            []string                   // 别名, 匹配与按钮规范化共用
 	Role               constant.RoleRequired      // 最低权限
 	DisablePrivate     bool                       // 是否禁止在私聊中使用
 	Describe           string                     // 指令描述
@@ -22,9 +21,9 @@ type Command struct {
 	PluginId           string                     // 属于的插件ID
 	SubCommand         []*Command                 // 子指令
 	SubCommandFallback CommandHandleFunc          // 子指令未找到时回退的函数
-	// 解析器
-	Parser       parser.Parser // 解析器接口
-	ParserTarget reflect.Type  // 解析模板
+	Args               any                        // 参数结构体(kong tag 声明), nil 时解析为剩余文本
+
+	children map[string]*Command // 名称+别名索引, 注册时构建
 }
 
 type Plugin struct {

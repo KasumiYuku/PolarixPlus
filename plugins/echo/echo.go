@@ -14,28 +14,28 @@ func init() {
 	var commands []*plugin.Command = make([]*plugin.Command, 0)
 
 	commands = append(commands, &plugin.Command{
-		Prefix:   "/echo",
+		Prefix:   "echo",
 		Role:     constant.RoleMember,
 		Describe: "回声洞",
 		Handle:   echoHandlefunc,
 	})
 
 	commands = append(commands, &plugin.Command{
-		Prefix:   "/random",
+		Prefix:   "random",
 		Role:     constant.RoleMember,
 		Describe: "随机图",
 		Handle:   randomImg,
 	})
 
 	commands = append(commands, &plugin.Command{
-		Prefix:   "/uid",
+		Prefix:   "uid",
 		Role:     constant.RoleMember,
 		Describe: "获取UID",
 		Handle:   getUid,
 	})
 
 	commands = append(commands, &plugin.Command{
-		Prefix:         "/gid",
+		Prefix:         "gid",
 		Role:           constant.RoleMember,
 		Describe:       "获取群ID",
 		Handle:         getGid,
@@ -43,7 +43,7 @@ func init() {
 	})
 
 	commands = append(commands, &plugin.Command{
-		Prefix:   "/showcase",
+		Prefix:   "showcase",
 		Role:     constant.RoleMember,
 		Describe: "消息构造器演示",
 		Handle:   showcase,
@@ -58,7 +58,11 @@ func init() {
 }
 
 func echoHandlefunc(context *context.MessageContext) error {
-	msg := context.Markdown(context.Raw)
+	text, _ := context.Parsed.(string)
+	if text == "" {
+		return nil
+	}
+	msg := context.Markdown(text)
 	k := &buttons.Keyboard{}
 	btn, _ := k.AppendButton("callbacktest", "回调按钮测试", "点击了", buttons.Gray, 0)
 	btn.SetCallbackWithoutHandle(context.Content).SetUnsupportedTip("1").SetUserWhiteList(append(make([]string, 0), context.UserId))
@@ -123,7 +127,7 @@ func showcase(ctx *context.MessageContext) error {
 	return ctx.Msg().
 		At(ctx.UserId).
 		Text(" 看这个").
-		Image(re.Url, "随机图").
+		Image(re.Url, "随机图", int(re.Width), int(re.Height)).
 		Markdown(fmt.Sprintf("> 图片源: [loliapi](https://www.loliapi.com/)\n\n```\n%v\n```", re.Url)).
 		Keyboard(k).
 		Send()

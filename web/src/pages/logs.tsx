@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { api, LogEntry, LogsView } from '../api'
-import { Button, Card, Empty, Icon, fmtTime, downloadLogs } from '../ui'
+import { Button, Card, Empty, Icon, Select, fmtTime, downloadLogs } from '../ui'
 import { onLog } from '../live'
 
 const LEVELS = ['ALL', 'DEBUG', 'INFO', 'WARN', 'ERROR'] as const
@@ -124,16 +124,13 @@ export default function LogsPage() {
             )}
           </For>
         </div>
-        <select
-          class="h-9 rounded-full border border-line-3 bg-field px-3.5 text-[12.5px] text-foreground outline-none transition-colors duration-300 focus:border-primary-600 focus:ring-2 focus:ring-primary-500/30"
-          value={scope()}
-          onChange={(e) => setScope(e.currentTarget.value)}
-        >
-          <option value="ALL">全部来源</option>
-          <For each={view().scopes}>
-            {(s) => <option value={s}>{s}</option>}
-          </For>
-        </select>
+        <div class="w-[150px] shrink-0">
+          <Select
+            options={[{ label: '全部来源', value: 'ALL' }, ...view().scopes.map((s) => ({ label: s, value: s }))]}
+            value={scope()}
+            onChange={(v) => setScope(v)}
+          />
+        </div>
         <div class="relative">
           <Icon name="search" size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground-2" />
           <input

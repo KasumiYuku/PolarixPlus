@@ -3,43 +3,48 @@ package plugin
 import (
 	"Plrx/lib/constant"
 	"Plrx/lib/context"
-	"Plrx/lib/parser"
-	"Plrx/lib/utils"
 	"cmp"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var GlobalCommands map[string]*Command = make(map[string]*Command)
+var aliasCommands = make(map[string]*Command)
 var globalPlugins = make(map[string]*Plugin)
 var pluginSettings = make(map[string]map[string]any)
 var pluginAccess = make(map[string]AccessConfig)
 var lock sync.RWMutex = sync.RWMutex{}
 var commandCount uint = 0
+var pluginDisabled atomic.Value // map[string]bool 快照: 停用插件集合, 读路径无锁
 
-// 处理所有子指令的回调函数
-func subCommandHandle(command *Command, pluginId string) {
-	// 处理解析器接口
-	if command.Parser == nil {
-		command.Parser = &parser.DefaultParser{}
-	}
-	// 处理PluginId
-	command.PluginId = pluginId
-	// 递增指令计数
-	commandCount++
-	if command.Handle == nil {
-		command.Handle = defaultCommandHandle
-	}
-	if len(command.SubCommand) > 0 {
-		// 处理回调函数
-		command.SubCommandFallback = command.Handle
-		command.Handle = subCommandHandleFunc
-		for k := range command.SubCommand {
-			subCommandHandle(command.SubCommand[k], pluginId)
+// normalizeName 剥离注册名携带的前缀符号, 统一以规范名入注册表。
+func normalizeName(name string) string {
+	for _, p := range []string{"/", "#", "!"} {
+		if strings.HasPrefix(name, p) && len(name) > len(p) {
+			return name[len(p):]
 		}
+	}
+	return name
+}
 
+// buildIndex 递归填充名称/别名索引与子指令表。
+func buildIndex(command *Command, pluginId string) {
+	command.PluginId = pluginId
+	command.Prefix = normalizeName(command.Prefix)
+	commandCount++
+	if len(command.SubCommand) > 0 {
+		command.children = make(map[string]*Command, len(command.SubCommand)*2)
+		for _, sub := range command.SubCommand {
+			buildIndex(sub, pluginId)
+			command.children[sub.Prefix] = sub
+			for _, alias := range sub.Aliases {
+				command.children[normalizeName(alias)] = sub
+			}
+		}
 	}
 }
 
@@ -47,23 +52,17 @@ func Register(plugin *Plugin) {
 	lock.Lock()
 	defer lock.Unlock()
 	globalPlugins[plugin.Id] = plugin
-	for k := range plugin.Commands {
-		v := plugin.Commands[k] // 读取指针
-		v.PluginId = plugin.Id
-		if v.Parser == nil {
-			v.Parser = &parser.DefaultParser{}
-		}
+	for _, v := range plugin.Commands {
 		if v.Handle == nil {
 			v.Handle = defaultCommandHandle
 		}
-		if len(v.SubCommand) > 0 {
-			// 存在子指令, 替换处理函数
-			subCommandHandle(v, plugin.Id)
-		} else {
-			commandCount++
-		}
+		buildIndex(v, plugin.Id)
 		GlobalCommands[v.Prefix] = v
+		for _, alias := range v.Aliases {
+			aliasCommands[normalizeName(alias)] = v
+		}
 	}
+	rebuildNameIndexLocked()
 }
 
 type ConfiguredPlugin struct {
@@ -83,6 +82,24 @@ type AccessRule struct {
 type AccessConfig struct {
 	Default  AccessRule            `json:"default"`
 	Commands map[string]AccessRule `json:"commands"`
+	Disabled bool                  `json:"disabled,omitempty"` // 停用整个插件
+}
+
+// Enabled 插件是否启用; 停用后指令与定时任务不再响应。
+func Enabled(id string) bool {
+	if m, ok := pluginDisabled.Load().(map[string]bool); ok {
+		return !m[id]
+	}
+	return true
+}
+
+// refreshDisabledLocked 从 pluginAccess 重建停用快照, 须持写锁。
+func refreshDisabledLocked() {
+	m := make(map[string]bool, len(pluginAccess))
+	for id, access := range pluginAccess {
+		m[id] = access.Disabled
+	}
+	pluginDisabled.Store(m)
 }
 
 type ManagedPlugin struct {
@@ -136,6 +153,7 @@ func LoadAccessConfigurations(configs map[string]AccessConfig) error {
 		}
 		pluginAccess[id] = access
 	}
+	refreshDisabledLocked()
 	return nil
 }
 
@@ -234,6 +252,7 @@ func ApplyAccessConfiguration(id string, access AccessConfig) {
 	lock.Lock()
 	defer lock.Unlock()
 	pluginAccess[id] = cloneAccessConfig(access)
+	refreshDisabledLocked()
 }
 
 func CanUse(pluginID, commandPath, userID, groupID string) bool {
@@ -256,20 +275,154 @@ func CanUse(pluginID, commandPath, userID, groupID string) bool {
 	}
 }
 
-func ResolveCommandPath(command *Command, raw string) string {
-	_, path := ResolveCommand(command, raw)
+// tokenCandidates 由词元派生匹配候选: 原词 + 逐前缀符号剥离。
+// 用于子指令名匹配, 故恒含原词(子指令名天然不带符号)。
+func tokenCandidates(token string) []string {
+	out := []string{token}
+	for _, p := range constant.PrefixChars() {
+		if p != "" && strings.HasPrefix(token, p) && len(token) > len(p) {
+			out = append(out, token[len(p):])
+		}
+	}
+	return out
+}
+
+// hasPrefixSymbol 词元是否携带已启用的前缀符号。
+func hasPrefixSymbol(token string) bool {
+	for _, p := range constant.PrefixChars() {
+		if p != "" && strings.HasPrefix(token, p) && len(token) > len(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// isExactSymbol 词元是否为孤立的已启用符号(如单独一个 "/")。
+func isExactSymbol(token string) bool {
+	for _, p := range constant.PrefixChars() {
+		if p != "" && token == p {
+			return true
+		}
+	}
+	return false
+}
+
+// matchCommandName 按候选表解析词元为根指令; allowBare=false 时无符号裸词失配。
+func matchCommandName(token string, allowBare bool) (*Command, bool) {
+	if !allowBare && !hasPrefixSymbol(token) {
+		return nil, false
+	}
+	lock.RLock()
+	defer lock.RUnlock()
+	for _, cand := range tokenCandidates(token) {
+		if cmd, ok := GlobalCommands[cand]; ok {
+			return cmd, true
+		}
+		if cmd, ok := aliasCommands[cand]; ok {
+			return cmd, true
+		}
+	}
+	return nil, false
+}
+
+// MatchCommand 兼容入口: 按当前无前缀开关解析单个词元。
+func MatchCommand(token string) (*Command, bool) {
+	return matchCommandName(token, constant.HasBarePrefix())
+}
+
+// commandNames 规范名有序索引, 粘合匹配时二分定位最长前缀。
+var commandNames []string
+
+// rebuildNameIndex 注册后重建规范名索引, 须持写锁。
+func rebuildNameIndexLocked() {
+	names := make([]string, 0, len(GlobalCommands))
+	for name := range GlobalCommands {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	commandNames = names
+}
+
+// gluedCommand 带符号词元的粘合匹配: /echoilove you → echo + "ilove you"。
+// 仅当词元以已启用符号开头时尝试, 普通口语词不受影响。
+func gluedCommand(token string) (*Command, string, bool) {
+	if !hasPrefixSymbol(token) {
+		return nil, "", false
+	}
+	name := token[1:]
+	if name == "" {
+		return nil, "", false
+	}
+	lock.RLock()
+	defer lock.RUnlock()
+	// 找最大的规范名前缀: lower_bound 前驱是字典序最大的候选
+	idx := sort.SearchStrings(commandNames, name)
+	if idx == 0 {
+		return nil, "", false
+	}
+	cand := commandNames[idx-1]
+	if !strings.HasPrefix(name, cand) || len(name) <= len(cand) {
+		return nil, "", false
+	}
+	cmd, ok := GlobalCommands[cand]
+	if !ok {
+		return nil, "", false
+	}
+	return cmd, name[len(cand):], true
+}
+
+// ResolveRoot 解析首词元为根指令, 三态: 精确/符号孤立/粘合。
+// 返回根指令与根指令之后的剩余词元(含粘合残留)。
+func ResolveRoot(tokens []string) (*Command, []string, bool) {
+	if len(tokens) == 0 {
+		return nil, nil, false
+	}
+	first := tokens[0]
+	if isExactSymbol(first) {
+		// "/ echo hi": 符号孤立成词, 指令名在下一词元
+		if len(tokens) < 2 {
+			return nil, nil, false
+		}
+		cmd, ok := matchCommandName(tokens[1], true)
+		if !ok {
+			return nil, nil, false
+		}
+		return cmd, tokens[2:], true
+	}
+	if cmd, ok := matchCommandName(first, constant.HasBarePrefix()); ok {
+		return cmd, tokens[1:], true
+	}
+	if cmd, rest, ok := gluedCommand(first); ok {
+		tail := make([]string, 0, len(tokens))
+		if rest != "" {
+			tail = append(tail, rest)
+		}
+		tail = append(tail, tokens[1:]...)
+		return cmd, tail, true
+	}
+	return nil, nil, false
+}
+
+// ResolveCommandPath 原始消息解析出的规范路径, 供访问控制展示。
+func ResolveCommandPath(root *Command, raw string) string {
+	tokens := strings.Fields(raw)
+	if len(tokens) < 2 {
+		return root.Prefix
+	}
+	_, path, _ := Resolve(root, tokens[1:])
 	return path
 }
 
-func ResolveCommand(command *Command, raw string) (*Command, string) {
-	path := command.Prefix
-	current := command
-	parts := strings.Fields(utils.FilterAt(raw))
-	for index := 1; index < len(parts) && len(current.SubCommand) > 0; index++ {
+// Resolve 沿子指令树走到叶子, tokens 为首词元之后的剩余词元。
+func Resolve(root *Command, tokens []string) (*Command, string, []string) {
+	path := root.Prefix
+	current := root
+	i := 0
+	for i < len(tokens) && len(current.children) > 0 {
 		var next *Command
-		for _, candidate := range current.SubCommand {
-			if candidate.Prefix == parts[index] {
-				next = candidate
+		for _, cand := range tokenCandidates(tokens[i]) {
+			if sub, ok := current.children[cand]; ok {
+				next = sub
 				break
 			}
 		}
@@ -278,8 +431,9 @@ func ResolveCommand(command *Command, raw string) (*Command, string) {
 		}
 		path += " " + next.Prefix
 		current = next
+		i++
 	}
-	return current, path
+	return current, path, tokens[i:]
 }
 
 func collectCommandPaths(command *Command, path string, result *[]string) {
@@ -350,7 +504,11 @@ func contains(values []string, target string) bool {
 }
 
 func cloneAccessConfig(source AccessConfig) AccessConfig {
-	result := AccessConfig{Default: cloneAccessRule(source.Default), Commands: make(map[string]AccessRule, len(source.Commands))}
+	result := AccessConfig{
+		Default:  cloneAccessRule(source.Default),
+		Commands: make(map[string]AccessRule, len(source.Commands)),
+		Disabled: source.Disabled,
+	}
 	for path, rule := range source.Commands {
 		result.Commands[path] = cloneAccessRule(rule)
 	}
@@ -438,61 +596,41 @@ func GetCommand(prefix string) (*Command, bool) {
 	return cmd, ok
 }
 
-// 处理包含子指令的指令
-func subCommandHandleFunc(context *context.MessageContext) error {
-	args := strings.Split(utils.FilterAt(context.Raw), " ") // 一定会有0号元素, 这里已经是传入的指令处理部分了
-	currentCmd, ok := GetCommand(args[0])                   // 获取父级指令对象
-	if !ok || currentCmd == nil {
-		return nil
+// NormalizeCommandMsg 按当前启用的前缀符号重写按钮命令文本;
+// 首词不是已注册指令时按自定义文字原样透传。
+func NormalizeCommandMsg(msg string) string {
+	tokens := strings.Fields(msg)
+	if len(tokens) < 1 {
+		return msg
 	}
-	commandPath := currentCmd.Prefix
-	context.BindStorage(currentCmd.PluginId, commandPath)
-	subCommandPrefixIndex := 1 // 子指令前缀的索引位置
-	for {
-		if currentCmd.Handle == nil || len(currentCmd.SubCommand) == 0 {
-			// 叶子指令
-			return currentCmd.Handle(context)
-		}
-
-		// 无法提取子指令
-		if len(args) <= subCommandPrefixIndex {
-			if currentCmd.SubCommandFallback == nil {
-				return nil
-			}
-			return currentCmd.SubCommandFallback(context)
-		}
-
-		prefix := args[subCommandPrefixIndex] // 子指令前缀
-		var targetCommand *Command
-		for k := range currentCmd.SubCommand {
-			v := currentCmd.SubCommand[k]
-			if v.Prefix == prefix {
-				// 匹配到子指令
-				targetCommand = v
-				break
-			}
-		}
-
-		if targetCommand == nil {
-			// 没有找到
-			if currentCmd.SubCommandFallback == nil {
-				return nil
-			}
-			return currentCmd.SubCommandFallback(context)
-		}
-		if context.MessageManager.Target == constant.PrivateMessage && targetCommand.DisablePrivate {
-			return nil
-		}
-
-		// 下一个匹配
-		currentCmd = targetCommand
-		commandPath += " " + currentCmd.Prefix
-		context.BindStorage(currentCmd.PluginId, commandPath)
-		subCommandPrefixIndex++
+	if _, ok := MatchCommand(tokens[0]); !ok {
+		return msg
 	}
+	name := canonicalName(tokens[0])
+	prefix := ""
+	for _, p := range constant.PrefixChars() {
+		if p != "" {
+			prefix = p
+			break
+		}
+	}
+	if prefix != "" {
+		tokens[0] = prefix + name
+	}
+	return strings.Join(tokens, " ")
 }
 
-// 获取总指令数
+// canonicalName 剥离词元携带的前缀符号, 得到规范名。
+func canonicalName(token string) string {
+	for _, p := range constant.PrefixChars() {
+		if p != "" && strings.HasPrefix(token, p) && len(token) > len(p) {
+			return token[len(p):]
+		}
+	}
+	return token
+}
+
+// GetCommandCount 获取总指令数
 func GetCommandCount() uint {
 	return commandCount
 }

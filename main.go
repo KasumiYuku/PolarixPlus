@@ -4,6 +4,7 @@ import (
 	"Plrx/lib/admin"
 	"Plrx/lib/assets"
 	_ "Plrx/lib/assets/providers"
+	"Plrx/lib/buttons"
 	"Plrx/lib/config"
 	"Plrx/lib/constant"
 	"Plrx/lib/gateway"
@@ -51,6 +52,8 @@ const (
 func main() {
 	appConfig := config.InitConfig()
 	logx.Open(logx.Options{Ring: logx.DefaultRing, Level: appConfig.LogLevel})
+	constant.SetPrefixChars(appConfig.Prefixes)
+	buttons.SetCommandNormalizer(plugin.NormalizeCommandMsg)
 
 	// 初始化相关配置
 	if err := plugin.LoadConfigurations(appConfig.PluginSettings); err != nil {
@@ -66,6 +69,7 @@ func main() {
 		accessConfigs[id] = plugin.AccessConfig{
 			Default:  plugin.AccessRule{Mode: access.Default.Mode, Users: access.Default.Users, Groups: access.Default.Groups},
 			Commands: commands,
+			Disabled: access.Disabled,
 		}
 	}
 	if err := plugin.LoadAccessConfigurations(accessConfigs); err != nil {

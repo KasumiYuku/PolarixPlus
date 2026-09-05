@@ -49,6 +49,31 @@ export function Icon(props: { name: IconName; size?: number; class?: string }) {
   )
 }
 
+// ---------- 自绘勾选框 ----------
+
+export function Checkbox(props: { checked: boolean; onChange: (v: boolean) => void; class?: string }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={props.checked}
+      class={`grid h-4.5 w-4.5 shrink-0 cursor-pointer place-items-center rounded-[5px] border transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+        props.checked
+          ? 'border-primary-600 bg-primary-600 text-primary-foreground'
+          : 'border-line-4 bg-field hover:border-primary-500/50'
+      } ${props.class ?? ''}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        props.onChange(!props.checked)
+      }}
+    >
+      <Show when={props.checked}>
+        <Icon name="check" size={11} />
+      </Show>
+    </button>
+  )
+}
+
 // ---------- 按钮 (有机胶囊) ----------
 
 type BtnVariant = 'primary' | 'ghost' | 'danger' | 'soft'
@@ -328,8 +353,14 @@ export async function fetchText(path: string): Promise<string> {
 
 // ---------- 自定义单选下拉 ----------
 
+type SelectOption = string | { label: string; value: string }
+
+function normOption(opt: SelectOption) {
+  return typeof opt === 'string' ? { label: opt, value: opt } : opt
+}
+
 export function Select(props: {
-  options: string[]
+  options: SelectOption[]
   value?: string
   onChange: (v: string) => void
   placeholder?: string
@@ -343,6 +374,9 @@ export function Select(props: {
   onMount(() => document.addEventListener('mousedown', close))
   onCleanup(() => document.removeEventListener('mousedown', close))
 
+  const opts = () => props.options.map(normOption)
+  const current = () => opts().find((o) => o.value === props.value)
+
   const pick = (value: string) => {
     props.onChange(value)
     setOpen(false)
@@ -355,23 +389,23 @@ export function Select(props: {
         class={`flex h-9.5 w-full cursor-pointer items-center justify-between gap-2 rounded-full border bg-field px-4 text-left text-[13px] text-muted-foreground outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary-500/40 ${open() ? 'border-primary-600' : 'border-line-3 hover:border-line-4'}`}
         onClick={() => setOpen(!open())}
       >
-        <span class="truncate">{props.value ?? props.placeholder ?? '请选择'}</span>
+        <span class="truncate">{current()?.label ?? props.placeholder ?? '请选择'}</span>
         <Icon name="chevron" size={14} class="shrink-0" />
       </button>
       <Show when={open()}>
         <div class="px-pop absolute left-0 right-0 top-[calc(100%+6px)] z-[60] overflow-hidden border border-line-3 bg-dropdown shadow-md" style={{ 'border-radius': '1.15rem 1.35rem 1rem 1.45rem' }}>
           <div class="max-h-60 overflow-y-auto p-1.5">
-            <For each={props.options}>
-              {(opt) => (
+            <For each={opts()}>
+              {(o) => (
                 <button
                   type="button"
                   class={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-foreground transition-colors duration-300 ${
-                    props.value === opt ? 'bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300' : 'hover:bg-muted-hover'
+                    props.value === o.value ? 'bg-primary-50 text-primary-700 dark:bg-primary-400/15 dark:text-primary-300' : 'hover:bg-muted-hover'
                   }`}
-                  onClick={() => pick(opt)}
+                  onClick={() => pick(o.value)}
                 >
-                  <span class="truncate">{opt}</span>
-                  <Show when={props.value === opt}>
+                  <span class="truncate">{o.label}</span>
+                  <Show when={props.value === o.value}>
                     <Icon name="check" size={14} />
                   </Show>
                 </button>
@@ -432,18 +466,16 @@ export function MultiSelect(props: {
           <div class="max-h-60 overflow-y-auto p-1.5">
             <For each={props.options}>
               {(opt) => (
-                <label class={`flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-300 ${props.values.includes(opt) ? 'bg-primary-50 dark:bg-primary-400/10' : 'hover:bg-muted-hover'}`}>
-                  <input
-                    type="checkbox"
-                    class="h-3.5 w-3.5 accent-[var(--primary-600)]"
-                    checked={props.values.includes(opt)}
-                    onChange={() => toggle(opt)}
-                  />
+                <div
+                  class={`flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-300 ${props.values.includes(opt) ? 'bg-primary-50 dark:bg-primary-400/10' : 'hover:bg-muted-hover'}`}
+                  onClick={() => toggle(opt)}
+                >
+                  <Checkbox checked={props.values.includes(opt)} onChange={toggle} />
                   <span class="flex-1 truncate font-mono text-xs text-foreground">{opt}</span>
                   <Show when={props.values.includes(opt)}>
                     <Icon name="check" size={14} class="text-primary-600 dark:text-primary-400" />
                   </Show>
-                </label>
+                </div>
               )}
             </For>
           </div>

@@ -7,22 +7,35 @@ import (
 	"Plrx/lib/plugin"
 	"Plrx/lib/templates"
 	"fmt"
-	"strings"
 )
+
+type bindArgs struct {
+	UID string `kong:"arg,name='uid',help='要绑定的 UID'"`
+}
+
+type confirmArgs struct {
+	UID  string `kong:"arg,name='uid',help='要绑定的 UID'"`
+	Code string `kong:"arg,name='code',help='绑定验证码'"`
+}
 
 func init() {
 	commands := make([]*plugin.Command, 0)
-	subCommands := make([]*plugin.Command, 0)
-	subCommands = append(subCommands, &plugin.Command{
-		Prefix: "confirm",
-		Handle: confirmCode,
-		Role:   constant.RoleMember,
-	})
 	commands = append(commands, &plugin.Command{
-		Prefix:     "/bind",
-		Role:       constant.RoleMember,
-		SubCommand: subCommands,
-		Handle:     startBind,
+		Prefix:   "bind",
+		Aliases:  []string{"绑定"},
+		Role:     constant.RoleMember,
+		Describe: "开始绑定流程",
+		Args:     &bindArgs{},
+		Handle:   startBind,
+		SubCommand: []*plugin.Command{
+			{
+				Prefix:   "confirm",
+				Role:     constant.RoleMember,
+				Describe: "确认绑定验证码",
+				Args:     &confirmArgs{},
+				Handle:   confirmCode,
+			},
+		},
 	})
 	self := &plugin.Plugin{}
 	self.Commands = commands
@@ -31,27 +44,21 @@ func init() {
 }
 
 func startBind(ctx *context.MessageContext) error {
-	args := strings.Split(ctx.Content, " ")
-	if len(args) < 2 {
-		return ctx.Text("请使用/绑定 [UID]来开始绑定流程").Send()
-	}
-	msg := ctx.UnsafeMarkdownTemplate("BindGuide", &templates.Args{"uid": args[1]})
+	a := ctx.Parsed.(*bindArgs)
+	msg := ctx.UnsafeMarkdownTemplate("BindGuide", &templates.Args{"uid": a.UID})
 	k := &buttons.Keyboard{}
 	btn, _ := k.AppendButton("2", "点击我输入UID", "请输入UID", buttons.Blue, 0)
-	btn.SetAutoCommand(fmt.Sprintf("/bind confirm %v ", args[1]), false, false).SetUserWhiteList(append(make([]string, 0), ctx.UserId)).SetUnsupportedTip("不支持按钮")
+	btn.SetAutoCommand(fmt.Sprintf("/bind confirm %v ", a.UID), false, false).SetUserWhiteList(append(make([]string, 0), ctx.UserId)).SetUnsupportedTip("不支持按钮")
 	msg.Keyboard(k)
 	return msg.Send()
 }
 
 func confirmCode(ctx *context.MessageContext) error {
-	args := strings.Split(ctx.Content, " ")
-	if len(args) < 4 {
-		return ctx.Text("指令不正确\n请使用/绑定 [UID]来开始绑定流程").Send()
-	}
-	msg := ctx.UnsafeMarkdownTemplate("BindConfirm", &templates.Args{"uid": args[2], "code": args[3]})
+	a := ctx.Parsed.(*confirmArgs)
+	msg := ctx.UnsafeMarkdownTemplate("BindConfirm", &templates.Args{"uid": a.UID, "code": a.Code})
 	k := &buttons.Keyboard{}
 	btn, _ := k.AppendButton("confirm", "确认无误", "已确认", buttons.Blue, 0)
-	btn.SetCallback(fmt.Sprintf("%v %v", args[2], args[3]), cb).SetUserWhiteList(append(make([]string, 0), ctx.UserId)).SetUnsupportedTip("不支持按钮")
+	btn.SetCallback(fmt.Sprintf("%v %v", a.UID, a.Code), cb).SetUserWhiteList(append(make([]string, 0), ctx.UserId)).SetUnsupportedTip("不支持按钮")
 	msg.Keyboard(k)
 	return msg.Send()
 }

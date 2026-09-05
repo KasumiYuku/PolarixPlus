@@ -158,11 +158,9 @@ func (w *conn) handle(f frame) error {
 	case opReconnect:
 		return errReconnect
 	case opInvalidSession:
-		// d=false 可恢复走 RESUME; d=true 会话已丢弃须重新鉴权
-		if !bytesEq(f.D, false) {
-			return errInvalidSession
-		}
-		return fmt.Errorf("%w: 可恢复会话, 重连时 RESUME", errReconnect)
+		// 会话失效一律重新鉴权, 不再按 d 标志尝试 RESUME:
+		// 休眠/断网后服务端会话早已过期, RESUME 只会无限失败
+		return errInvalidSession
 	case opDispatch:
 		w.onDispatch(f)
 	}
@@ -178,10 +176,12 @@ func (w *conn) onDispatch(f frame) {
 		json.Unmarshal(f.D, &ready)
 		w.c.setSession(ready.SessionID)
 		w.c.setOnline(true)
+		w.c.markReady()
 		w.startHeartbeat()
 		logger.Infof("连接就绪, session=%s", ready.SessionID)
 	case "RESUMED":
 		w.c.setOnline(true)
+		w.c.markReady()
 		w.startHeartbeat()
 		logger.Infof("会话恢复成功")
 	}

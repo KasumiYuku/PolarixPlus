@@ -118,6 +118,7 @@ export interface AccessRule {
 export interface AccessConfig {
   default: AccessRule
   commands: Record<string, AccessRule>
+  disabled?: boolean
 }
 
 export interface JobInfo {

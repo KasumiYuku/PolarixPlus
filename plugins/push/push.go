@@ -62,30 +62,35 @@ func SetClient(c *qqapi.Client) {
 	client = c
 }
 
+type pushKeyArgs struct {
+	Key string `kong:"arg,name='key',help='推送密钥'"`
+}
+
 func init() {
 	plugin.Register(&plugin.Plugin{
 		Id: pluginID,
 		Commands: []*plugin.Command{
 			{
-				Prefix:   "/enablepush",
+				Prefix:   "enablepush",
 				Role:     constant.RoleOwner,
 				Describe: "允许机器人向当前会话主动推送",
 				Handle:   enablePush,
 			},
 			{
-				Prefix:   "/disablepush",
+				Prefix:   "disablepush",
 				Role:     constant.RoleOwner,
 				Describe: "关闭机器人对当前会话的主动推送",
 				Handle:   disablePush,
 			},
 			{
-				Prefix:   "/pushkey",
+				Prefix:   "pushkey",
 				Role:     constant.RoleOwner,
 				Describe: "设置主动推送的密钥",
+				Args:     &pushKeyArgs{},
 				Handle:   setPushKey,
 			},
 			{
-				Prefix:   "/pushstatus",
+				Prefix:   "pushstatus",
 				Role:     constant.RoleOwner,
 				Describe: "查看当前会话的主动推送状态",
 				Handle:   pushStatus,
@@ -154,12 +159,8 @@ func pushStatus(ctx *context.MessageContext) error {
 }
 
 func setPushKey(ctx *context.MessageContext) error {
-	args := strings.Fields(ctx.Content)
-	fmt.Printf("设置密钥指令Content: %v\n", ctx.Content)
-	if len(args) < 2 {
-		return ctx.Text("用法: /pushkey [key]").Send()
-	}
-	key := args[1]
+	args := ctx.Parsed.(*pushKeyArgs)
+	key := args.Key
 	if key == "" {
 		return ctx.Text("密钥不能为空").Send()
 	}
