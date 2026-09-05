@@ -140,10 +140,9 @@ func (p *mine) Upload(ctx context.Context, in assets.ProviderInput) (string, err
 
 ## 编写插件
 
-插件放在 `plugins/` 目录（不是 `lib/plugin`），在 `plugins/register.go` 匿名导入。框架在 `init()` 阶段收集插件，`main` 启动时统一加载配置与访问控制。
+一个插件就是 `plugins/` 下的一个 Go 包，在 `plugins/register.go` 里匿名导入，由 `init()` 里的一次 `plugin.Register(...)` 完成注册。框架在启动时统一加载插件配置与访问控制。你只管声明指令和处理逻辑，匹配、权限、参数解析、配置热更都是框架的活。
 
-<details>
-<summary>插件结构：模板与 Plugin / Config 字段（点击展开）</summary>
+### 最小可用插件
 
 ```go
 package myplugin
@@ -161,64 +160,102 @@ func init() {
 		Description: "一个示例",
 		Commands: []*plugin.Command{
 			{
-				Prefix:         "/hello",
-				Role:           constant.RoleMember,
-				DisablePrivate: false,
-				Describe:       "打招呼",
-				Handle:         hello,
+				Prefix:   "hello",               // 规范名, 不带任何前缀符号
+				Aliases:  []string{"打招呼"},     // 中文别名, 用户直接打"打招呼"也一样
+				Role:     constant.RoleMember,
+				Describe: "打招呼",
+				Handle:   hello,
 			},
 		},
-		Config: []plugin.ConfigField{
-			{Key: "greeting", Label: "问候语", Type: "text", Placeholder: "你好"},
-			{Key: "admin_only", Label: "仅管理员", Type: "boolean"},
-			{Key: "api_key", Label: "API Key", Type: "password", Required: true},
-		},
-		ValidateConfig: validate,
-		ApplyConfig:    apply,
 	})
 }
 
-func hello(ctx *context.MessageContext) error { return ctx.Text("你好").Send() }
-func validate(values map[string]any) error    { /* 返回 error 拒绝保存 */ }
-func apply(values map[string]any) error       { /* 配置生效时调用，可初始化客户端 */ }
+func hello(ctx *context.MessageContext) error {
+	return ctx.Text("你好").Send()
+}
 ```
 
-| Plugin 字段 | 说明 |
-|---|---|
-| `Id` | 插件唯一 ID，日志与配置定位 |
-| `Name` / `Description` | 展示名称与描述，管理台卡片显示 |
-| `Commands` | 指令列表 |
-| `Config` | 配置项声明，面板据此渲染表单（保存即热更） |
-| `ValidateConfig` | 保存前校验，返回 error 则拒绝写入 |
-| `ApplyConfig` | 启动加载与每次保存后调用，适合初始化客户端 |
+注册之后它立刻可被这些方式触发：`/hello`、`#hello`、`hello`（勾选无前缀时）、`打招呼`。**前缀符号不属于插件**——是全局配置，见下。
 
-配置类型：`text` / `password` / `boolean` / `number`。`password` 不回显，留空保存表示保留原值；`Required` 标记必填。
+### 指令怎么被触发（前缀系统）
+
+- `config.json` 的 `prefixes` 字段决定允许哪些符号（`/` `#` `!` 与无前缀 `""`），管理台设置页可多选，重启生效，默认全开
+- 插件注册只需写规范名：`Prefix: "hello"`，误写成 `/hello` 也会被框架剥掉
+- 匹配是三态：精确 → 符号独立成词（`/ echo hi`）→ 粘合（`/echoilove you` 自动拆成 echo + "ilove you"，只对带符号的词元尝试，口语词不会被误伤）
+- 关闭"无前缀"后，不带符号的裸词不会命中任何指令
+
+<details>
+<summary>Command 字段速查（点击展开）</summary>
+
+| Command 字段 | 说明 |
+|---|---|
+| `Prefix` | 指令规范名，不带前缀符号（框架自动剥离误写的 `/` `#` `!`） |
+| `Aliases` | 别名列表，中文别名直接可用 |
+| `Role` | 最低身份要求：`RoleMember` / `RoleAdmin` / `RoleOwner`，不满足时静默失败 |
+| `DisablePrivate` | 禁止私聊使用 |
+| `Describe` | 指令描述，管理台展示 |
+| `Handle` | 处理函数 `func(*context.MessageContext) error`，错误写日志、不发给用户 |
+| `PermissionDenied` | 权限不足时调用，可自定义提示 |
+| `HandleError` | `Handle` 返回错误或 panic 后调用 |
+| `SubCommand` / `SubCommandFallback` | 子指令列表；未命中任何子指令时回退（默认父指令 `Handle`） |
+| `Args` | 参数声明：`nil`（默认，整句文本进 `ctx.Parsed`）或参数结构体 |
 
 </details>
 
 <details>
-<summary>指令系统：Command 字段 / 子指令 / 参数解析（点击展开）</summary>
+<summary>参数解析：从"整句文本"到"声明式结构体"（点击展开）</summary>
 
-| Command 字段 | 说明 |
-|---|---|
-| `Prefix` | 指令前缀，只有匹配的消息进入插件；后注册的同前缀覆盖先注册的 |
-| `Role` | 最低身份要求：`RoleMember` / `RoleAdmin` / `RoleOwner`，不满足静默失败 |
-| `DisablePrivate` | 禁止私聊使用 |
-| `Describe` | 指令描述 |
-| `Handle` | 处理函数 `func(*context.MessageContext) error`，错误写日志不发给用户 |
-| `PermissionDenied` | 权限不足时调用，可自定义提示 |
-| `HandleError` | `Handle` 返回错误或 panic 后调用 |
-| `SubCommand` / `SubCommandFallback` | 子指令列表；未命中任何子指令时回退（默认父指令 `Handle`） |
-| `Parser` / `ParserTarget` | 参数解析器与解析目标类型 |
+**什么都不声明** — 指令名之后的整段文本自动进 `ctx.Parsed` 作为字符串，适合"复读/翻译/画图"这类整句型指令：
 
-子指令就是嵌套的普通指令：命中 `Prefix` 后按消息下一个词继续匹配，可多层嵌套。访问控制会为每个子指令路径生成独立规则（如 `/parent child`）。
+```go
+{Prefix: "echo", Handle: func(ctx *context.MessageContext) error {
+	return ctx.Text(ctx.Parsed.(string)).Send()
+}}
+```
+
+**声明结构体** — 参数解析基于 kong（Go 生态标准的声明式解析器），只记两个词：`kong:"arg"` 是位置参数（**默认必填**，不用写 required），加 `,optional` 变可选。字段顺序即参数顺序，类型自动转换：
+
+```go
+type GiftArgs struct {
+	User   string `kong:"arg"`            // 必填
+	Amount int    `kong:"arg"`            // 必填
+	Reason string `kong:"arg,optional"`   // 可选
+}
+
+{Prefix: "gift", Args: &GiftArgs{}, Handle: func(ctx *context.MessageContext) error {
+	a := ctx.Parsed.(*GiftArgs)
+	return ctx.Text(fmt.Sprintf("%s +%d (%s)", a.User, a.Amount, a.Reason)).Send()
+}}
+```
+
+缺参、类型错、校验失败时，框架**自动把用法文案回复给用户**——插件不碰错误分支。
+
+**自定义校验** — 给参数结构体加一个 `Validate() error` 方法即可，错误同样以用法文案回复：
+
+```go
+func (a *GiftArgs) Validate() error {
+	if a.Amount > 10000 {
+		return fmt.Errorf("单次最多 10000")
+	}
+	return nil
+}
+```
+
+想让用法文案更好看，可以加展示名：`kong:"arg,name='uid',help='要绑定的 UID'"`。现有实例：`plugins/bind`、`plugins/push`。
+
+</details>
+
+<details>
+<summary>子指令（点击展开）</summary>
+
+子指令就是嵌套的普通指令：命中 `Prefix` 后按消息的下一个词继续匹配，可以多层。访问控制会为每个子指令路径生成独立规则（如 `db clean`）。
 
 ```go
 plugin.Register(&plugin.Plugin{
 	Id: "console",
 	Commands: []*plugin.Command{
 		{
-			Prefix: "/db",
+			Prefix: "db",
 			Handle: dbHelp,
 			SubCommand: []*plugin.Command{
 				{Prefix: "list", Handle: dbList},
@@ -229,40 +266,31 @@ plugin.Register(&plugin.Plugin{
 })
 ```
 
-**参数解析** — 默认 `DefaultParser` 把原始消息整体作为字符串放入 `ctx.Parsed`。需要结构化参数时自定义 `parser.Parser`（`Parse(msg string, result any) error`），`ParserTarget` 指向目标结构体类型：
-
-```go
-type Args struct{ Keyword string; Count int }
-
-type myParser struct{}
-func (p *myParser) Parse(msg string, result any) error {
-	fields := strings.Fields(msg)
-	target := result.(*Args)
-	target.Keyword = fields[1]
-	target.Count, _ = strconv.Atoi(fields[2])
-	return nil
-}
-
-&plugin.Command{
-	Prefix:       "/search",
-	Parser:       &myParser{},
-	ParserTarget: reflect.TypeOf(Args{}),
-	Handle: func(ctx *context.MessageContext) error {
-		args := ctx.Parsed.(Args) // 类型断言
-		return ctx.Text(fmt.Sprintf("搜索 %s x%d", args.Keyword, args.Count)).Send()
-	},
-}
-```
+按钮的 `SetAutoCommand` 文本由框架按当前启用的符号集自动规范化：插件写 `random` 还是 `/random` 都行，配置变更后按钮依然可用。
 
 </details>
 
-**访问控制** — 管理台自动为所有指令（含子指令路径）提供规则，保存在 `plugin_access`：
+### 插件配置
 
-- `off` — 关闭限制，所有人可用（默认）
-- `whitelist` — 仅名单内用户 / 群可用
-- `blacklist` — 名单内用户 / 群禁用
+`Config` 声明配置项，管理台据此渲染表单，保存即热更（插件自己实现 `ValidateConfig` / `ApplyConfig` 把关与落地）：
 
-每个插件可设 `default` 规则再按指令路径覆盖；群聊优先使用 `member_openid`，缺失回退 `union_openid`，私聊使用 `user_openid`。
+```go
+Config: []plugin.ConfigField{
+	{Key: "greeting", Label: "问候语", Type: "text", Placeholder: "你好"},
+	{Key: "admin_only", Label: "仅管理员", Type: "boolean"},
+	{Key: "api_key", Label: "API Key", Type: "password", Required: true},
+},
+ValidateConfig: validate,   // 保存前校验, 返回 error 拒绝写入
+ApplyConfig:    apply,      // 启动加载与每次保存后调用, 适合初始化客户端
+```
+
+配置类型：`text` / `password` / `boolean` / `number`。`password` 不回显，留空保存表示保留原值；`Required` 标记必填。
+
+### 启停与访问控制
+
+- **插件启停**：管理台插件详情页的"插件状态"开关，停用后该插件的所有指令与定时任务即时停止响应（与未知指令一致，静默），随时可重新启用，无需重启
+- **访问控制**：管理台自动为所有指令（含子指令路径）提供规则：`off` 全部放行（默认）/ `whitelist` 仅名单 / `blacklist` 名单禁用；插件级 `default` + 指令路径覆盖
+- 群聊身份取 `member_openid`（缺失回退 `union_openid`），私聊取 `user_openid`
 
 <details>
 <summary>常用 API：发送消息 / 按钮键盘（点击展开）</summary>
@@ -291,7 +319,7 @@ ctx.Msg().At(ctx.UserId).Text(" 看这个").
 ```go
 k := &buttons.Keyboard{}
 btn, _ := k.AppendButton("id", "点击前", "点击后", buttons.Blue, 0)
-btn.SetAutoCommand("/hello", false, false)   // 点击发送指令
+btn.SetAutoCommand("hello", false, false)    // 点击发送指令，符号由框架补
 btn.SetHref("https://example.com")           // 跳转链接（带协议头）
 btn.SetCallback("data", cbHandle)            // 回调 + 处理函数
 btn.SetCallbackWithoutHandle("data")         // 仅回调数据，由别处注册
@@ -305,7 +333,7 @@ btn.SetUnsupportedTip("此按钮不可用")
 </details>
 
 <details>
-<summary>进阶能力：定时任务 / 存储 / Markdown 模板 / 请求（点击展开）</summary>
+<summary>进阶能力：定时任务 / 存储 / Markdown 模板 / 请求 / 入站消息（点击展开）</summary>
 
 **定时任务** — 支持 Cron 与 Interval（同时设置优先 Interval）：
 
@@ -321,7 +349,7 @@ schedule.Register(&schedule.Job{
 })
 ```
 
-任务可 `Cancel` / `Pause` / `Resume`，管理台实时展示。`ScheduleContext` 无关联用户消息，发送需主动推送。
+任务可 `Cancel` / `Pause` / `Resume`，管理台实时展示。插件停用时其定时任务不再触发。`ScheduleContext` 无关联用户消息，发送需主动推送。
 
 **存储** — SQLite 键值，五级命名空间自动绑定上下文：
 
@@ -359,7 +387,7 @@ ctx.Request.PostMultipart(url, mp, &result, headers)
 
 `body` 可为 `[]byte` 或可 JSON 序列化对象；`result` 为带 json 标签的结构体指针（nil 不解析）。
 
-**入站消息** — `ctx.Raw` / `ctx.Content` / `ctx.Parsed`（需类型断言）/ `ctx.MessageId` / `ctx.UserId` / `ctx.GroupId` / `ctx.Target`（`constant.PrivateMessage` / `GroupMessage`）；解析增强：`ctx.Mentions` @列表、`ctx.Quote` 引用、`ctx.Emojis`、`ctx.AttachmentTypes`、`ctx.AvatarURL`。
+**入站消息** — `ctx.Raw`（原始全文）/ `ctx.Content`（清洗后）/ `ctx.Parsed`（参数，见上）/ `ctx.MessageId` / `ctx.UserId` / `ctx.GroupId` / `ctx.Target`（`constant.PrivateMessage` / `GroupMessage`）；解析增强：`ctx.Mentions` @列表、`ctx.Quote` 引用、`ctx.Emojis`、`ctx.AttachmentTypes`、`ctx.AvatarURL`。
 
 </details>
 
